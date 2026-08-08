@@ -2,6 +2,8 @@
 // @name        pokeclicker-scripts
 // @namespace   ilkecan
 // @match       https://www.pokeclicker.com/
+// @match       pokeclicker://game/index.html
+// @match       file:///home/*/.config/pokeclicker-desktop/pokeclicker-master/docs/index.html
 // @require     hatchery.js
 // @grant       none
 // @icon        https://raw.githubusercontent.com/pokeclicker/pokeclicker/develop/src/assets/images/favicon.ico
