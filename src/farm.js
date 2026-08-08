@@ -2,15 +2,7 @@
 
 function _catchWanderers() {
   App.game.farming.plotList.forEach((plot) => {
-    if (plot.canCatchWanderer()) {
-      App.game.farming.handleWanderer(plot);
-    }
-
-    plot._wanderer.subscribe((wanderer) => {
-      if (wanderer) {
-        App.game.farming.handleWanderer(plot);
-      }
-    });
+    _whenReady(plot._wanderer, () => App.game.farming.handleWanderer(plot));
   });
 }
 

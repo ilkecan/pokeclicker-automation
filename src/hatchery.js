@@ -55,21 +55,8 @@ function _fillHatchery() {
 }
 
 function _breedPokemons() {
-  _fillHatchery();
-
-  const eggSlotFree = ko.pureComputed(() => App.game.breeding.hasFreeEggSlot());
-  eggSlotFree.subscribe((free) => {
-    if (free) {
-      _fillHatchery();
-    }
-  });
-
-  const queueEmpty = ko.pureComputed(_queueIsEmpty);
-  queueEmpty.subscribe((empty) => {
-    if (empty) {
-      _fillHatchery();
-    }
-  });
+  _whenReady(ko.pureComputed(() => App.game.breeding.hasFreeEggSlot()), _fillHatchery);
+  _whenReady(ko.pureComputed(_queueIsEmpty), _fillHatchery);
 }
 
 function automateHatchery() {
