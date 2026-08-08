@@ -30,7 +30,17 @@ function _hatchEggs() {
   });
 }
 
+function _queueIsEmpty() {
+  return App.game.breeding.queueList().length === 0;
+}
+
 function _fillHatchery() {
+  if (!_queueIsEmpty()) {
+    // something is queued (manually, by the player), back off and let the
+    // game's own queue-consumption fill the slot instead of racing it.
+    return;
+  }
+
   for (const p of BreedingController.hatcherySortedFilteredList()) {
     if (!p.isHatchable()) {
       continue;
@@ -50,6 +60,13 @@ function _breedPokemons() {
   const eggSlotFree = ko.pureComputed(() => App.game.breeding.hasFreeEggSlot());
   eggSlotFree.subscribe((free) => {
     if (free) {
+      _fillHatchery();
+    }
+  });
+
+  const queueEmpty = ko.pureComputed(_queueIsEmpty);
+  queueEmpty.subscribe((empty) => {
+    if (empty) {
       _fillHatchery();
     }
   });
