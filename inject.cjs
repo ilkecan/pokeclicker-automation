@@ -116,7 +116,9 @@ setImmediate(() => {
     });
 
     window.webContents.on('console-message', (event) => {
-      console.log('[page console]', event.message);
+      console.log(event)
+      const method = event.level === 'warning' ? 'warn' : event.level;
+      console[method](`[page console] ${event.message} (${event.sourceId}:${event.lineNumber})`);
     });
   });
 });
