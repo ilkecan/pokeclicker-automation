@@ -4,6 +4,7 @@
 // @match       https://www.pokeclicker.com/
 // @match       pokeclicker://game/index.html
 // @match       file:///home/*/.config/pokeclicker-desktop/pokeclicker-master/docs/index.html
+// @require     farm.js
 // @require     hatchery.js
 // @grant       none
 // @icon        https://raw.githubusercontent.com/pokeclicker/pokeclicker/develop/src/assets/images/favicon.ico
@@ -15,5 +16,6 @@
 "use strict";
 
 GameLoadState.onLoadState(GameLoadState.states.running, () => {
+  automateFarm();
   automateHatchery();
 });
