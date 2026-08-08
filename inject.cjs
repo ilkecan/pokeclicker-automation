@@ -70,6 +70,15 @@ async function buildPayload(entrySource) {
 
   return `(function() {
   async function run() {
+    // Guarantees strict mode here regardless of @require order/content, unlike
+    // under real userscript managers where it depends on the first-concatenated
+    // file/require declaring it. A stricter runtime here is a pure bug catching
+    // mechanism, not a behavioral guarantee this environment makes to the other
+    // one. Both run the same source, so a mistake strict mode catches here gets
+    // fixed at the source and the fix is correct in both regardless of the
+    // other's strict-mode status.
+    "use strict";
+
     // Deliberately not wrapped in per-file blocks: real userscript managers
     // concatenate all @require sources into one script, so top-level function
     // declarations across files are mutually hoisted regardless of order.
