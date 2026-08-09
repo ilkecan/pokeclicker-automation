@@ -68,7 +68,7 @@ async function getRequires(entrySource) {
 async function buildPayload(entrySource) {
   const parts = await getRequires(entrySource);
 
-  return `(function() {
+  return `(() => {
   async function run() {
     // Guarantees strict mode here regardless of @require order/content, unlike
     // under real userscript managers where it depends on the first-concatenated
