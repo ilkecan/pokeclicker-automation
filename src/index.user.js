@@ -7,6 +7,7 @@
 // @require     common.js
 // @require     farm.js
 // @require     hatchery.js
+// @require     items.js
 // @require     underground.js
 // @grant       none
 // @icon        https://raw.githubusercontent.com/pokeclicker/pokeclicker/develop/src/assets/images/favicon.ico
@@ -20,5 +21,6 @@
 GameLoadState.onLoadState(GameLoadState.states.running, () => {
   automateFarm();
   automateHatchery();
+  automateItems();
   automateUnderground();
 });
