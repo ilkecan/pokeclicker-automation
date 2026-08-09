@@ -8,12 +8,13 @@ function _hatchEggWhenReady(egg, index, subscriptions) {
     return;
   }
 
-  if (egg.canHatch()) {
+  const canHatch = ko.pureComputed(() => egg.canHatch());
+
+  if (canHatch()) {
     App.game.breeding.hatchPokemonEgg(index);
     return;
   }
 
-  const canHatch = ko.pureComputed(() => egg.canHatch());
   subscriptions[index] = canHatch.subscribe((ready) => {
     if (ready) {
       App.game.breeding.hatchPokemonEgg(index);
@@ -34,8 +35,8 @@ function _queueIsEmpty() {
   return App.game.breeding.queueList().length === 0;
 }
 
-function _fillHatchery() {
-  if (!_queueIsEmpty()) {
+function _fillHatchery(queueIsEmpty, hasFreeEggSlot) {
+  if (!queueIsEmpty()) {
     // something is queued (manually, by the player), back off and let the
     // game's own queue-consumption fill the slot instead of racing it.
     return;
@@ -46,7 +47,7 @@ function _fillHatchery() {
       continue;
     }
 
-    if (!App.game.breeding.hasFreeEggSlot()) {
+    if (!hasFreeEggSlot()) {
       break;
     }
 
@@ -55,8 +56,12 @@ function _fillHatchery() {
 }
 
 function _breedPokemons() {
-  _whenReady(ko.pureComputed(() => App.game.breeding.hasFreeEggSlot()), _fillHatchery);
-  _whenReady(ko.pureComputed(_queueIsEmpty), _fillHatchery);
+  const queueIsEmpty = ko.pureComputed(_queueIsEmpty);
+  const hasFreeEggSlot = ko.pureComputed(() => App.game.breeding.hasFreeEggSlot());
+  const fillHatchery = () => _fillHatchery(queueIsEmpty, hasFreeEggSlot);
+
+  _whenReady(hasFreeEggSlot, fillHatchery);
+  _whenReady(queueIsEmpty, fillHatchery);
 }
 
 function automateHatchery() {
