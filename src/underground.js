@@ -14,13 +14,17 @@ function _dig() {
   _useSurvey();
 }
 
-function _sellTreasures() {
-  const treasures = UndergroundItems.list.filter((item) => item.hasSellValue());
+function _sellUndergroundTreasures() {
+  const treasures = UndergroundItems.list.filter((item) => item.valueType === UndergroundItemValueType.Diamond);
   const treasuresToSell = treasures.filter((treasure) => ItemList[treasure.itemName].basePrice === Infinity); // exclude Everstone
   for (const treasure of treasuresToSell) {
     const canSell = ko.pureComputed(() => treasure.isUnlocked() && !treasure.sellLocked() && player.itemList[treasure.itemName]() > 0);
     _whenReady(canSell, () => UndergroundTrading.quickSell(treasure));
   }
+}
+
+function _sellTreasures() {
+  _sellUndergroundTreasures();
 }
 
 function automateUnderground() {
