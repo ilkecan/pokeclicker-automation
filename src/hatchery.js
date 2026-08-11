@@ -64,7 +64,11 @@ function _breedPokemons() {
   _whenReady(queueIsEmpty, fillHatchery);
 }
 
-function automateHatchery() {
+function _automateHatchery() {
   _hatchEggs();
   _breedPokemons();
+}
+
+function automateHatchery() {
+  ko.when(() => App.game.breeding.canAccess(), _automateHatchery);
 }

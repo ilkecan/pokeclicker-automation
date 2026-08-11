@@ -16,6 +16,10 @@ function _claimCompletedQuests() {
   });
 }
 
-function automateQuests() {
+function _automateQuests() {
   _claimCompletedQuests();
+}
+
+function automateQuests() {
+  ko.when(() => App.game.quests.isDailyQuestsUnlocked(), _automateQuests);
 }

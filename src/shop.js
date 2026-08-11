@@ -54,6 +54,10 @@ function _buyPokeBalls() {
   }
 }
 
+function _automateShop() {
+  _buyPokeBalls();
+}
+
 function automateShop() {
-  ko.when(ShopHandler.shortcutVisible, _buyPokeBalls);
+  ko.when(() => ShopHandler.shortcutVisible(), _automateShop);
 }

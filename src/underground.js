@@ -27,7 +27,11 @@ function _sellTreasures() {
   _sellUndergroundTreasures();
 }
 
-function automateUnderground() {
+function _automateUnderground() {
   _dig();
   _sellTreasures();
+}
+
+function automateUnderground() {
+  ko.when(() => App.game.underground.canAccess(), _automateUnderground);
 }

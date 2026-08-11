@@ -27,7 +27,11 @@ function _harvestWitheringBerries() {
   });
 }
 
-function automateFarm() {
+function _automateFarm() {
   _catchWanderers();
   _harvestWitheringBerries();
+}
+
+function automateFarm() {
+  ko.when(() => App.game.farming.canAccess(), _automateFarm);
 }
