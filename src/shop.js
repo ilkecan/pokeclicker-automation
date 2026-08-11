@@ -5,24 +5,6 @@ function _synchronizeItemPrice(item) {
   item.price(Math.round(item.basePrice * multiplier));
 }
 
-function _calculatePokeballAmount(pokeball, maxAmount) {
-  let amount;
-  if (pokeball.multiplier === 1) {
-    amount = Math.floor(App.game.wallet.currencies[pokeball.currency]() / pokeball.basePrice)
-  } else {
-    amount = 1;
-    while (true) {
-      const nextAmount = amount + 1;
-      if (pokeball.totalPrice(nextAmount) > nextAmount * pokeball.basePrice) {
-        break;
-      }
-      amount = nextAmount;
-    }
-  }
-
-  return Math.min(amount, maxAmount);
-}
-
 function _buyPokeBall(pokeball, targetAmountPerBall) {
   const numBallNeeded = ko.pureComputed(() => targetAmountPerBall[pokeball.name] - App.game.statistics.pokeballsObtained[GameConstants.Pokeball[pokeball.name]]());
   if (numBallNeeded() <= 0) {
@@ -33,7 +15,21 @@ function _buyPokeBall(pokeball, targetAmountPerBall) {
   const shouldBuy = ko.pureComputed(() => pokeball.price() == pokeball.basePrice);
   const canBuy = ko.pureComputed(() => App.game.wallet.currencies[pokeball.currency]() >= pokeball.basePrice);
   const ready = ko.pureComputed(() => numBallNeeded() > 0 && shouldBuy() && canBuy());
-  _whenReady(ready, () => pokeball.buy(_calculatePokeballAmount(pokeball, numBallNeeded())));
+  _whenReady(ready, () => {
+    const currency = App.game.wallet.currencies[pokeball.currency];
+    let remaining = numBallNeeded();
+
+    if (pokeball.multiplier === 1) {
+      const affordable = Math.floor(currency() / pokeball.basePrice);
+      pokeball.buy(Math.min(affordable, remaining));
+      return;
+    }
+
+    while (remaining > 0 && pokeball.price() === pokeball.basePrice && currency() >= pokeball.basePrice) {
+      pokeball.buy(1);
+      remaining--;
+    }
+  });
 }
 
 function _buyPokeBalls() {
