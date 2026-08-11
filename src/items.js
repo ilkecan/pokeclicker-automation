@@ -16,12 +16,12 @@ function _pokemonsWithoutHeldItem() {
 function _giveHeldItems() {
   const pokemons = ko.pureComputed(_pokemonsWithoutHeldItem);
 
-  const canGiveHeldItem = ko.pureComputed(() => (
+  const canGiveHeldItem = ko.pureComputed(() =>
     pokemons().some((pokemon) => {
       const item = _chooseHeldItem(pokemon);
       return player.amountOfItem(item.name) && item.canUse(pokemon);
     })
-  ));
+  );
 
   _whenReady(canGiveHeldItem, function() {
     for (const pokemon of pokemons()) {
