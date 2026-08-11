@@ -15,11 +15,7 @@ function _hatchEggWhenReady(egg, index, subscriptions) {
     return;
   }
 
-  subscriptions[index] = canHatch.subscribe((ready) => {
-    if (ready) {
-      App.game.breeding.hatchPokemonEgg(index);
-    }
-  });
+  subscriptions[index] = ko.when(canHatch, () => App.game.breeding.hatchPokemonEgg(index));
 }
 
 function _hatchEggs() {
