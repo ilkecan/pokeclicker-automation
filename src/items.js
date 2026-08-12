@@ -19,7 +19,7 @@ function _giveHeldItems() {
   const canGiveHeldItem = ko.pureComputed(() =>
     pokemons().some((pokemon) => {
       const item = _chooseHeldItem(pokemon);
-      return player.amountOfItem(item.name) && item.canUse(pokemon);
+      return player.amountOfItem(item.name) > 0 && item.canUse(pokemon);
     })
   );
 
