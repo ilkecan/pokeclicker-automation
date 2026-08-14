@@ -1,73 +1,75 @@
 "use strict";
 
-function _claimCompletedQuests() {
-  const claimableQuests = ko.pureComputed(() =>
-    App.game.quests.questList().filter(
-      (quest) => quest.isCompleted() && !quest.claimed(),
-    ),
-  );
+const automateQuests = (() => {
+  function claimCompletedQuests() {
+    const claimableQuests = ko.pureComputed(() =>
+      App.game.quests.questList().filter(
+        (quest) => quest.isCompleted() && !quest.claimed(),
+      ),
+    );
 
-  const canClaimQuest = ko.pureComputed(() => claimableQuests().length > 0);
+    const canClaimQuest = ko.pureComputed(() => claimableQuests().length > 0);
 
-  _whenReady(canClaimQuest, () => {
-    for (const quest of claimableQuests()) {
-      App.game.quests.claimQuest(quest.index);
-    }
-  });
-}
+    _whenReady(canClaimQuest, () => {
+      for (const quest of claimableQuests()) {
+        App.game.quests.claimQuest(quest.index);
+      }
+    });
+  }
 
-const _questOrder = [
-  "CatchShiniesQuest",
-  "HatchEggsQuest",
-  "GainGemsQuest",
-  "MineLayersQuest",
-  "MineItemsQuest",
+  const questOrder = [
+    "CatchShiniesQuest",
+    "HatchEggsQuest",
+    "GainGemsQuest",
+    "MineLayersQuest",
+    "MineItemsQuest",
 
-  "GainMoneyQuest",
-  "DefeatPokemonsQuest",
+    "GainMoneyQuest",
+    "DefeatPokemonsQuest",
 
-  "GainTokensQuest",
-  "CapturePokemonsQuest",
-  "CapturePokemonTypesQuest",
-  "UsePokeballQuest",
+    "GainTokensQuest",
+    "CapturePokemonsQuest",
+    "CapturePokemonTypesQuest",
+    "UsePokeballQuest",
 
-  "DefeatGymQuest",
-  "DefeatDungeonQuest",
+    "DefeatGymQuest",
+    "DefeatDungeonQuest",
 
-  "HarvestBerriesQuest",
-  "GainFarmPointsQuest",
+    "HarvestBerriesQuest",
+    "GainFarmPointsQuest",
 
-  "ClearBattleFrontierQuest",
-  "CatchShadowsQuest",
-  "UseOakItemQuest",
-];
+    "ClearBattleFrontierQuest",
+    "CatchShadowsQuest",
+    "UseOakItemQuest",
+  ];
 
-const _questPriorityMapping = new Map(_questOrder.map((questType, priority) => [questType, priority]));
+  const questPriorityMapping = new Map(questOrder.map((questType, priority) => [questType, priority]));
 
-function _questPriority(quest) {
-  return _questPriorityMapping.get(quest.constructor.name) ?? Infinity;
-}
+  function questPriority(quest) {
+    return questPriorityMapping.get(quest.constructor.name) ?? Infinity;
+  }
 
-function _chooseQuestsToStart(quests, number) {
-  return quests.sort((a, b) => _questPriority(a) - _questPriority(b)).slice(0, number);
-}
+  function chooseQuestsToStart(quests, number) {
+    return quests.sort((a, b) => questPriority(a) - questPriority(b)).slice(0, number);
+  }
 
-function _startQuests() {
-  const emptyQuestSlots = ko.pureComputed(() => App.game.quests.questSlots() - App.game.quests.currentQuests().length);
-  const unstartedQuests = ko.pureComputed(() => App.game.quests.incompleteQuests().filter((quest) => !quest.inProgress()));
+  function startQuests() {
+    const emptyQuestSlots = ko.pureComputed(() => App.game.quests.questSlots() - App.game.quests.currentQuests().length);
+    const unstartedQuests = ko.pureComputed(() => App.game.quests.incompleteQuests().filter((quest) => !quest.inProgress()));
 
-  _whenReady(ko.pureComputed(() => emptyQuestSlots() > 0 && unstartedQuests().length > 0), () => {
-    for (const quest of _chooseQuestsToStart(unstartedQuests(), emptyQuestSlots())) {
-      App.game.quests.beginQuest(quest.index);
-    }
-  });
-}
+    _whenReady(ko.pureComputed(() => emptyQuestSlots() > 0 && unstartedQuests().length > 0), () => {
+      for (const quest of chooseQuestsToStart(unstartedQuests(), emptyQuestSlots())) {
+        App.game.quests.beginQuest(quest.index);
+      }
+    });
+  }
 
-function _automateQuests() {
-  _claimCompletedQuests();
-  _startQuests();
-}
+  function automate() {
+    claimCompletedQuests();
+    startQuests();
+  }
 
-function automateQuests() {
-  ko.when(() => App.game.quests.isDailyQuestsUnlocked(), _automateQuests);
-}
+  return function automateQuests() {
+    ko.when(() => App.game.quests.isDailyQuestsUnlocked(), automate);
+  };
+})();
