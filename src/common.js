@@ -1,11 +1,12 @@
 "use strict";
 
-function _whenReady(computed, action) {
-  if (computed()) {
-    action();
-  }
+function _runAndSubscribe(observable, action) {
+  action(observable());
+  return observable.subscribe(action);
+}
 
-  computed.subscribe((ready) => {
+function _whenReady(computed, action) {
+  return _runAndSubscribe(computed, (ready) => {
     if (ready) {
       action();
     }
