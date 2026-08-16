@@ -264,14 +264,7 @@ const automateUnderground = (() => {
       })));
   }
 
-  // how often an item spawns is not visible, so the spawn weights stay out of
-  // this
-  function availableItems(mine) {
-    return MineConfigs.find(mine.mineType).getAvailableItems();
-  }
-
-  function averageItemTileCount(mine) {
-    const items = availableItems(mine);
+  function averageItemTileCount(items) {
     const tiles = items.reduce((sum, item) => sum + item.space.flat().filter((cell) => cell === 1).length, 0);
     return tiles / items.length;
   }
@@ -288,11 +281,10 @@ const automateUnderground = (() => {
   // each in turn, since which one the box was placed off is not visible.
   //
   // Rotation drops out: it swaps the two axes, which the box measures alike.
-  function averageItemTilesInBox(mine, range) {
-    const items = availableItems(mine);
-
+  function averageItemTilesInBox(state, range) {
+    const { availableItems } = state;
     let total = 0;
-    for (const item of items) {
+    for (const item of availableItems) {
       const cells = getShapeVariants(item.id)[0];
 
       let covered = 0;
@@ -305,7 +297,7 @@ const automateUnderground = (() => {
       total += covered / cells.length;
     }
 
-    return total / items.length;
+    return total / availableItems.length;
   }
 
   function collapseFrames(frames) {
@@ -341,6 +333,9 @@ const automateUnderground = (() => {
   function createDigState(mine, tools, dischargePatterns) {
     const tileRecords = buildTileRecords(mine);
     const allTileRecords = tileRecords.flat();
+    // how often an item spawns is not visible, so the spawn weights stay out
+    // of this
+    const availableItems = MineConfigs.find(mine.mineType).getAvailableItems();
 
     return {
       mine,
@@ -348,7 +343,8 @@ const automateUnderground = (() => {
       dischargePatterns,
       tileRecords,
       allTileRecords,
-      averageItemTileCount: averageItemTileCount(mine),
+      availableItems,
+      averageItemTileCount: averageItemTileCount(availableItems),
       // by box range, which changes only with the underground level
       itemTilesInBox: new Map(),
       items: [],
@@ -364,7 +360,7 @@ const automateUnderground = (() => {
   }
 
   function refreshWeights(state) {
-    const { mine, tileRecords, allTileRecords, surveyed, unclaimed, weights } = state;
+    const { mine, tileRecords, allTileRecords, averageItemTileCount, surveyed, unclaimed, weights } = state;
     const items = deduceItems(tileRecords, allTileRecords);
     state.items = items;
 
@@ -418,9 +414,9 @@ const automateUnderground = (() => {
     // items evenly like this ignores that. A coverage map computed from the
     // mine's dimensions and the shapes would price it, at the cost of another
     // pass.
-    const unseenItemTiles = unseenItemCount * state.averageItemTileCount;
+    const unseenItemTiles = unseenItemCount * averageItemTileCount;
     const unseenProbability = Math.min(unseenItemTiles / unclaimedTiles, 1);
-    const unseenRemainingDepth = state.averageItemTileCount * (unclaimedDepth / unclaimedTiles);
+    const unseenRemainingDepth = averageItemTileCount * (unclaimedDepth / unclaimedTiles);
     for (const record of allTileRecords) {
       if (record.tile.layerDepth === 0) {
         continue;
@@ -434,7 +430,7 @@ const automateUnderground = (() => {
   }
 
   function rebuildSurveyedTiles(state, centers) {
-    const { mine, surveyed } = state;
+    const { mine, surveyed, itemTilesInBox } = state;
     for (const row of surveyed) {
       row.fill(0);
     }
@@ -447,11 +443,11 @@ const automateUnderground = (() => {
       // placed off one tile of an item, so it holds that one and however many
       // of the item's others it happens to reach, spread over its own area.
       const range = record.tile.survey;
-      if (!state.itemTilesInBox.has(range)) {
-        state.itemTilesInBox.set(range, averageItemTilesInBox(mine, range));
+      if (!itemTilesInBox.has(range)) {
+        itemTilesInBox.set(range, averageItemTilesInBox(state, range));
       }
 
-      const probability = state.itemTilesInBox.get(range) / (range * range);
+      const probability = itemTilesInBox.get(range) / (range * range);
       const reach = Math.floor(range / 2);
       const fromX = Math.max(record.x - reach, 0);
       const toX = Math.min(record.x + reach, maxX);
@@ -468,7 +464,8 @@ const automateUnderground = (() => {
     }
   }
 
-  function trySurvey({ tools }) {
+  function trySurvey(state) {
+    const { tools } = state;
     if (!tools.survey.canUseTool()) {
       return false;
     }
@@ -477,7 +474,8 @@ const automateUnderground = (() => {
     return true;
   }
 
-  function batteryCandidate({ tileRecords, weights, dischargePatterns }) {
+  function batteryCandidate(state) {
+    const { tileRecords, weights, dischargePatterns } = state;
     const { battery } = App.game.underground;
     if (!battery.canDischarge()) {
       return null;
@@ -557,7 +555,8 @@ const automateUnderground = (() => {
     return total / item.placements.size;
   }
 
-  function bombCandidate({ mine, tools, items, allTileRecords, weights }) {
+  function bombCandidate(state) {
+    const { mine, tools, items, allTileRecords, weights } = state;
     // the other tools are preferable when every item is seen, so early return
     // to avoid extra work
     if (mine.itemsPartiallyFound >= mine.itemsBuried || !tools.bomb.canUseTool()) {
@@ -592,7 +591,8 @@ const automateUnderground = (() => {
     };
   }
 
-  function hammerCandidate({ mine, tools, tileRecords, weights, rowWeights }) {
+  function hammerCandidate(state) {
+    const { mine, tools, tileRecords, weights, rowWeights } = state;
     if (!tools.hammer.canUseTool()) {
       return null;
     }
@@ -678,7 +678,8 @@ const automateUnderground = (() => {
     return best;
   }
 
-  function chiselCandidate({ tools, allTileRecords, weights }) {
+  function chiselCandidate(state) {
+    const { tools, allTileRecords, weights } = state;
     if (!tools.chisel.canUseTool()) {
       return null;
     }
