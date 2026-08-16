@@ -266,10 +266,46 @@ const automateUnderground = (() => {
 
   // how often an item spawns is not visible, so the spawn weights stay out of
   // this
+  function availableItems(mine) {
+    return MineConfigs.find(mine.mineType).getAvailableItems();
+  }
+
   function averageItemTileCount(mine) {
-    const items = MineConfigs.find(mine.mineType).getAvailableItems();
+    const items = availableItems(mine);
     const tiles = items.reduce((sum, item) => sum + item.space.flat().filter((cell) => cell === 1).length, 0);
     return tiles / items.length;
+  }
+
+  // How far a box reaches: it is placed by shifting it off one of the item's
+  // tiles by up to half its width, so a tile this far from that one falls
+  // inside on this many of the shifts.
+  function boxReach(distance, range) {
+    return Math.max(range - Math.abs(distance), 0) / range;
+  }
+
+  // How many of an item's tiles a box of this range is expected to cover, given
+  // it is guaranteed to cover one of them. Summed over the item's own tiles from
+  // each in turn, since which one the box was placed off is not visible.
+  //
+  // Rotation drops out: it swaps the two axes, which the box measures alike.
+  function averageItemTilesInBox(mine, range) {
+    const items = availableItems(mine);
+
+    let total = 0;
+    for (const item of items) {
+      const cells = getShapeVariants(item.id)[0];
+
+      let covered = 0;
+      for (const chosen of cells) {
+        for (const cell of cells) {
+          covered += boxReach(cell.x - chosen.x, range) * boxReach(cell.y - chosen.y, range);
+        }
+      }
+
+      total += covered / cells.length;
+    }
+
+    return total / items.length;
   }
 
   function collapseFrames(frames) {
@@ -313,6 +349,8 @@ const automateUnderground = (() => {
       tileRecords,
       allTileRecords,
       averageItemTileCount: averageItemTileCount(mine),
+      // by box range, which changes only with the underground level
+      itemTilesInBox: new Map(),
       items: [],
       surveyCenters: ko.pureComputed(() => allTileRecords.filter((record) => record.tile.survey > 0)),
       // per tile chance a survey box gives it of hiding that box's item
@@ -405,11 +443,15 @@ const automateUnderground = (() => {
     const maxY = mine.height - 1;
     for (const record of centers) {
       // A survey marks its center tile with the range of the box drawn around
-      // it, which is exactly the area highlighted for the player. The box
-      // promises one item somewhere inside it, so each of its tiles carries an
-      // equal share of that one item.
+      // it, which is exactly the area highlighted for the player. The box is
+      // placed off one tile of an item, so it holds that one and however many
+      // of the item's others it happens to reach, spread over its own area.
       const range = record.tile.survey;
-      const probability = 1 / (range * range);
+      if (!state.itemTilesInBox.has(range)) {
+        state.itemTilesInBox.set(range, averageItemTilesInBox(mine, range));
+      }
+
+      const probability = state.itemTilesInBox.get(range) / (range * range);
       const reach = Math.floor(range / 2);
       const fromX = Math.max(record.x - reach, 0);
       const toX = Math.min(record.x + reach, maxX);
