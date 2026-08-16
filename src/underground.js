@@ -663,10 +663,7 @@ const automateUnderground = (() => {
     const subscriptions = [];
 
     _whenReady(mineObservable, () => {
-      for (const subscription of subscriptions) {
-        subscription.dispose();
-      }
-      subscriptions.length = 0;
+      _disposeAll(subscriptions);
 
       const mine = mineObservable();
       subscriptions.push(ko.when(() => mine.timeUntilDiscovery <= 0, () => {

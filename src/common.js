@@ -1,8 +1,10 @@
 "use strict";
 
-function _runAndSubscribe(observable, action) {
-  action(observable());
-  return observable.subscribe(action);
+function _disposeAll(subscriptions) {
+  for (const subscription of subscriptions) {
+    subscription.dispose();
+  }
+  subscriptions.length = 0;
 }
 
 function _whenReady(computed, action) {
@@ -11,4 +13,9 @@ function _whenReady(computed, action) {
       action();
     }
   });
+}
+
+function _runAndSubscribe(observable, action) {
+  action(observable());
+  return observable.subscribe(action);
 }
