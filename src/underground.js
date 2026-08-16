@@ -272,13 +272,44 @@ const automateUnderground = (() => {
     return tiles / items.length;
   }
 
-  function createDigState(mine, tools) {
+  function collapseFrames(frames) {
+    const tiles = new Map();
+    for (const frame of frames) {
+      for (const { coordinate: { x, y }, depth } of frame ?? []) {
+        const key = `${x}:${y}`;
+        const tile = tiles.get(key);
+        if (!tile) {
+          tiles.set(key, { x, y, depth });
+        } else {
+          tile.depth += depth;
+        }
+      }
+    }
+
+    return [...tiles.values()];
+  }
+
+  function trackDischargePatterns() {
+    const unlocked = { patterns: [], totalWeight: 0 };
+
+    for (const pattern of App.game.underground.battery.patterns) {
+      ko.when(() => pattern.canAccess(), () => {
+        unlocked.patterns.push({ weight: pattern.weight, tiles: collapseFrames(pattern.pattern) });
+        unlocked.totalWeight += pattern.weight;
+      });
+    }
+
+    return unlocked;
+  }
+
+  function createDigState(mine, tools, dischargePatterns) {
     const tileRecords = buildTileRecords(mine);
     const allTileRecords = tileRecords.flat();
 
     return {
       mine,
       tools,
+      dischargePatterns,
       tileRecords,
       allTileRecords,
       averageItemTileCount: averageItemTileCount(mine),
@@ -395,15 +426,6 @@ const automateUnderground = (() => {
     }
   }
 
-  function tryBattery() {
-    if (!App.game.underground.battery.canDischarge()) {
-      return false;
-    }
-
-    App.game.underground.battery.discharge();
-    return true;
-  }
-
   function trySurvey({ tools }) {
     if (!tools.survey.canUseTool()) {
       return false;
@@ -411,6 +433,28 @@ const automateUnderground = (() => {
 
     App.game.underground.tools.useTool(tools.survey.id, 0, 0);
     return true;
+  }
+
+  function batteryCandidate({ tileRecords, weights, dischargePatterns }) {
+    const { battery } = App.game.underground;
+    if (!battery.canDischarge()) {
+      return null;
+    }
+
+    let total = 0;
+    for (const { weight, tiles } of dischargePatterns.patterns) {
+      let value = 0;
+      for (const { x, y, depth } of tiles) {
+        value += weights[y][x] * Math.min(tileRecords[y][x].tile.layerDepth, depth);
+      }
+
+      total += weight * value;
+    }
+
+    return {
+      value: total / dischargePatterns.totalWeight,
+      use: () => battery.discharge(),
+    };
   }
 
   // The chance one bomb clears every tile of `needs` at once, each wanting
@@ -611,7 +655,7 @@ const automateUnderground = (() => {
 
   function tryDig(state) {
     let best = { value: 0 };
-    for (const candidate of [bombCandidate(state), hammerCandidate(state), chiselCandidate(state)]) {
+    for (const candidate of [batteryCandidate(state), bombCandidate(state), hammerCandidate(state), chiselCandidate(state)]) {
       if (candidate && candidate.value > best.value) {
         best = candidate;
       }
@@ -625,9 +669,10 @@ const automateUnderground = (() => {
     return true;
   }
 
-  // The battery and the survey come first because neither competes for a dig:
-  // the battery costs nothing and the survey digs nothing.
-  const digStrategies = [tryBattery, trySurvey, tryDig];
+  // The survey digs nothing, but it does spend the tick. It pays in information
+  // about later digs, which does not convert into what a dig is worth, so it
+  // goes first for want of a common unit.
+  const digStrategies = [trySurvey, tryDig];
 
   function digOnce(state) {
     // Read from the mine each tick because with `deferUpdates` on, anything
@@ -641,8 +686,8 @@ const automateUnderground = (() => {
     }
   }
 
-  function digMine(mine, tools) {
-    const state = createDigState(mine, tools);
+  function digMine(mine, tools, dischargePatterns) {
+    const state = createDigState(mine, tools, dischargePatterns);
     const digSubscription = App.game.statistics.secondsPlayed.subscribe(() => digOnce(state));
 
     return [
@@ -659,6 +704,7 @@ const automateUnderground = (() => {
       bomb: App.game.underground.tools.getTool(UndergroundToolType.Bomb),
       survey: App.game.underground.tools.getTool(UndergroundToolType.Survey),
     };
+    const dischargePatterns = trackDischargePatterns();
     const mineObservable = App.game.underground._mine;
     const subscriptions = [];
 
@@ -667,7 +713,7 @@ const automateUnderground = (() => {
 
       const mine = mineObservable();
       subscriptions.push(ko.when(() => mine.timeUntilDiscovery <= 0, () => {
-        subscriptions.push(...digMine(mine, tools));
+        subscriptions.push(...digMine(mine, tools, dischargePatterns));
       }));
     });
   }
