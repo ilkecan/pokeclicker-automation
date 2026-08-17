@@ -465,8 +465,14 @@ const automateUnderground = (() => {
   }
 
   function trySurvey(state) {
-    const { tools } = state;
+    const { mine, tools } = state;
     if (!tools.survey.canUseTool()) {
+      return false;
+    }
+
+    if (mine.itemsPartiallyFound >= mine.itemsBuried) {
+      // not because survey has no value when all items are partially found,
+      // but because `refreshWeights` never utilize in that case
       return false;
     }
 
