@@ -11,11 +11,6 @@ const automateHatchery = (() => {
 
     const shouldHatch = ko.pureComputed(() => egg.canHatch() && App.game.breeding.hatcheryHelpers.hired().length <= index);
 
-    if (shouldHatch()) {
-      App.game.breeding.hatchPokemonEgg(index);
-      return;
-    }
-
     subscriptions[index] = ko.when(shouldHatch, () => App.game.breeding.hatchPokemonEgg(index));
   }
 
