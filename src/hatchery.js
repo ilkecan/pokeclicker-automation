@@ -9,14 +9,14 @@ const automateHatchery = (() => {
       return;
     }
 
-    const canHatch = ko.pureComputed(() => egg.canHatch());
+    const shouldHatch = ko.pureComputed(() => egg.canHatch() && App.game.breeding.hatcheryHelpers.hired().length <= index);
 
-    if (canHatch()) {
+    if (shouldHatch()) {
       App.game.breeding.hatchPokemonEgg(index);
       return;
     }
 
-    subscriptions[index] = ko.when(canHatch, () => App.game.breeding.hatchPokemonEgg(index));
+    subscriptions[index] = ko.when(shouldHatch, () => App.game.breeding.hatchPokemonEgg(index));
   }
 
   function hatchEggs() {
