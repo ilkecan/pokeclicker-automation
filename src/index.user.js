@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        pokeclicker-scripts
+// @name        pokeclicker-automation
 // @namespace   ilkecan
 // @match       https://www.pokeclicker.com/
 // @match       pokeclicker://game/index.html

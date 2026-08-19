@@ -84,7 +84,7 @@ async function buildPayload(entrySource) {
     // declarations across files are mutually hoisted regardless of order.
     ${parts.join('\n')}
     ${entrySource}
-    console.log('[pokeclicker-scripts] injected OK');
+    console.log('[pokeclicker-automation] injected OK');
   }
 
   // did-finish-load fires after window "load", which is strictly after DOMContentLoaded,
@@ -94,7 +94,7 @@ async function buildPayload(entrySource) {
   // main.js navigating directly to the real game page, with no intermediate
   // splash/loading navigation first. If some wrapper does that, did-finish-load would
   // fire early for that intermediate, Game-less page and this assumption would break.
-  run().catch((e) => console.error('[pokeclicker-scripts] injection error', e));
+  run().catch((e) => console.error('[pokeclicker-automation] injection error', e));
 })();`;
 }
 
@@ -112,7 +112,7 @@ setImmediate(() => {
       const matches = getMatches(entrySource);
       const url = window.webContents.getURL();
       if (matches.length && !matches.some((re) => re.test(url))) {
-        console.log('[pokeclicker-scripts] skipping injection, URL does not match @match:', url);
+        console.log('[pokeclicker-automation] skipping injection, URL does not match @match:', url);
         return;
       }
 
@@ -120,7 +120,7 @@ setImmediate(() => {
         const payload = await buildPayload(entrySource);
         await window.webContents.executeJavaScript(payload);
       } catch (e) {
-        console.error('[pokeclicker-scripts] injection failed', e);
+        console.error('[pokeclicker-automation] injection failed', e);
       }
     });
 
