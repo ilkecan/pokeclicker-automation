@@ -9,7 +9,11 @@ const automateHatchery = (() => {
       return;
     }
 
-    const shouldHatch = ko.pureComputed(() => egg.canHatch() && App.game.breeding.hatcheryHelpers.hired().length <= index);
+    const shouldHatch = ko.pureComputed(() => _and([
+      AutomationSettings.getValue("hatchery", "hatchReadyEggs"),
+      egg.canHatch(),
+      App.game.breeding.hatcheryHelpers.hired().length <= index,
+    ]));
 
     subscriptions[index] = ko.when(shouldHatch, () => App.game.breeding.hatchPokemonEgg(index));
   }
@@ -49,10 +53,13 @@ const automateHatchery = (() => {
   function breedPokemons() {
     const queueIsEmpty = ko.pureComputed(isQueueEmpty);
     const hasFreeEggSlot = ko.pureComputed(() => App.game.breeding.hasFreeEggSlot());
-    const fillHatcheryWhenReady = () => fillHatchery(queueIsEmpty, hasFreeEggSlot);
+    const shouldFillHatchery = ko.pureComputed(() => _and([
+      AutomationSettings.getValue("hatchery", "fillEggSlots"),
+      queueIsEmpty(),
+      hasFreeEggSlot(),
+    ]));
 
-    _whenReady(hasFreeEggSlot, fillHatcheryWhenReady);
-    _whenReady(queueIsEmpty, fillHatcheryWhenReady);
+    _whenReady(shouldFillHatchery, () => fillHatchery(queueIsEmpty, hasFreeEggSlot));
   }
 
   function automate() {

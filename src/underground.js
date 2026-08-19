@@ -740,9 +740,17 @@ const automateUnderground = (() => {
   function digMine(mine, tools, dischargePatterns) {
     const state = createDigState(mine, tools, dischargePatterns);
     const digTick = ko.pureComputed(() => {
+      if (!AutomationSettings.getValue("underground", "dig")) {
+        return null;
+      }
+
       return Math.floor(App.game.statistics.secondsPlayed() / DIG_INTERVAL_SECONDS);
     });
-    const digSubscription = digTick.subscribe(() => digOnce(state));
+    const digSubscription = digTick.subscribe((tick) => {
+      if (tick !== null) {
+        digOnce(state);
+      }
+    });
 
     return [
       _runAndSubscribe(state.surveyCenters, (centers) => rebuildSurveyedTiles(state, centers)),
@@ -807,10 +815,12 @@ const automateUnderground = (() => {
         return Math.min(Math.ceil(gemsRemaining / gemPlate.value), availablePlates);
       });
 
-      _whenReady(
-        ko.pureComputed(() => amountToSell() > 0),
-        () => UndergroundController.sellMineItem(gemPlate, amountToSell()),
-      );
+      const shouldSell = ko.pureComputed(() => _and([
+        AutomationSettings.getValue("underground", "sellGemPlates"),
+        amountToSell() > 0,
+      ]));
+
+      _whenReady(shouldSell, () => UndergroundController.sellMineItem(gemPlate, amountToSell()));
     }
   }
 
@@ -818,7 +828,12 @@ const automateUnderground = (() => {
     const treasures = UndergroundItems.list.filter((item) => item.valueType === UndergroundItemValueType.Diamond);
     const treasuresToSell = treasures.filter((treasure) => ItemList[treasure.itemName].basePrice === Infinity); // exclude Everstone
     for (const treasure of treasuresToSell) {
-      const canSell = ko.pureComputed(() => treasure.isUnlocked() && !treasure.sellLocked() && player.itemList[treasure.itemName]() > 0);
+      const canSell = ko.pureComputed(() => _and([
+        AutomationSettings.getValue("underground", "sellTreasures"),
+        treasure.isUnlocked(),
+        !treasure.sellLocked(),
+        player.itemList[treasure.itemName]() > 0,
+      ]));
       _whenReady(canSell, () => UndergroundTrading.quickSell(treasure));
     }
   }

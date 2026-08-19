@@ -3,13 +3,21 @@
 const automateFarm = (() => {
   function catchWanderers() {
     App.game.farming.plotList.forEach((plot) => {
-      _whenReady(plot._wanderer, () => App.game.farming.handleWanderer(plot));
+      const shouldCatch = ko.pureComputed(() => _and([
+        AutomationSettings.getValue("farm", "catchWanderers"),
+        plot._wanderer(),
+      ]));
+      _whenReady(shouldCatch, () => App.game.farming.handleWanderer(plot));
     });
   }
 
   function harvestWitheringBerries() {
     App.game.farming.plotList.forEach((plot) => {
       const shouldHarvest = ko.pureComputed(() => {
+        if (!AutomationSettings.getValue("farm", "harvestWitheringBerries")) {
+          return false;
+        }
+
         if (plot.berry === BerryType.None || plot.isSafeLocked || plot.stage() !== PlotStage.Berry) {
           return false;
         }

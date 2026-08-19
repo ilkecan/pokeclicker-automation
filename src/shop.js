@@ -6,7 +6,7 @@ const automateShop = (() => {
     item.price(Math.round(item.basePrice * multiplier));
   }
 
-  function buyPokeBall(pokeball, targetAmountPerBall) {
+  function buyPokeBall(pokeball, targetAmountPerBall, buyingEnabled) {
     const numBallNeeded = ko.pureComputed(() => targetAmountPerBall[pokeball.name] - App.game.statistics.pokeballsObtained[GameConstants.Pokeball[pokeball.name]]());
     if (numBallNeeded() <= 0) {
       return;
@@ -15,7 +15,12 @@ const automateShop = (() => {
     synchronizeItemPrice(pokeball);
     const shouldBuy = ko.pureComputed(() => pokeball.price() == pokeball.basePrice);
     const canBuy = ko.pureComputed(() => App.game.wallet.currencies[pokeball.currency]() >= pokeball.basePrice);
-    const ready = ko.pureComputed(() => numBallNeeded() > 0 && shouldBuy() && canBuy());
+    const ready = ko.pureComputed(() => _and([
+      buyingEnabled(),
+      numBallNeeded() > 0,
+      shouldBuy(),
+      canBuy(),
+    ]));
     _whenReady(ready, () => {
       const currency = App.game.wallet.currencies[pokeball.currency];
       let remaining = numBallNeeded();
@@ -34,6 +39,7 @@ const automateShop = (() => {
   }
 
   function buyPokeBalls() {
+    const buyingEnabled = ko.pureComputed(() => AutomationSettings.getValue("shop", "buyPokeBalls"));
     const achievements = AchievementHandler.achievementList.filter((achievement) => achievement.property.achievementType === GameConstants.AchievementType["Poke Balls"]);
     const achievementsPerBall = Object.groupBy(achievements, (achievement) => GameConstants.Pokeball[achievement.property.pokeball]);
     const targetAmountPerBall = Object.fromEntries(
@@ -47,7 +53,7 @@ const automateShop = (() => {
       .filter((item) => item instanceof PokeballItem)
       .sort((a, b) => b.basePrice - a.basePrice);
     for (const pokeball of pokeballs) {
-      buyPokeBall(pokeball, targetAmountPerBall);
+      buyPokeBall(pokeball, targetAmountPerBall, buyingEnabled);
     }
   }
 

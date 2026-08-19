@@ -3,12 +3,16 @@
 const automateQuests = (() => {
   function claimCompletedQuests() {
     const claimableQuests = ko.pureComputed(() =>
-      App.game.quests.questList().filter(
-        (quest) => quest.isCompleted() && !quest.claimed(),
-      ),
+      App.game.quests.questList().filter((quest) => _and([
+        quest.isCompleted(),
+        !quest.claimed(),
+      ]))
     );
 
-    const canClaimQuest = ko.pureComputed(() => claimableQuests().length > 0);
+    const canClaimQuest = ko.pureComputed(() => _and([
+      AutomationSettings.getValue("quests", "claimCompletedQuests"),
+      claimableQuests().length > 0,
+    ]));
 
     _whenReady(canClaimQuest, () => {
       for (const quest of claimableQuests()) {
@@ -56,8 +60,13 @@ const automateQuests = (() => {
   function startQuests() {
     const emptyQuestSlots = ko.pureComputed(() => App.game.quests.questSlots() - App.game.quests.currentQuests().length);
     const unstartedQuests = ko.pureComputed(() => App.game.quests.incompleteQuests().filter((quest) => !quest.inProgress()));
+    const canStartQuest = ko.pureComputed(() => _and([
+      AutomationSettings.getValue("quests", "startQuests"),
+      emptyQuestSlots() > 0,
+      unstartedQuests().length > 0,
+    ]));
 
-    _whenReady(ko.pureComputed(() => emptyQuestSlots() > 0 && unstartedQuests().length > 0), () => {
+    _whenReady(canStartQuest, () => {
       for (const quest of chooseQuestsToStart(unstartedQuests(), emptyQuestSlots())) {
         App.game.quests.beginQuest(quest.index);
       }

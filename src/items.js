@@ -17,12 +17,16 @@ const automateItems = (() => {
   function giveHeldItems() {
     const pokemons = ko.pureComputed(pokemonsWithoutHeldItem);
 
-    const canGiveHeldItem = ko.pureComputed(() =>
-      pokemons().some((pokemon) => {
+    const canGiveHeldItem = ko.pureComputed(() => {
+      if (!AutomationSettings.getValue("items", "giveHeldItems")) {
+        return false;
+      }
+
+      return pokemons().some((pokemon) => {
         const item = chooseHeldItem(pokemon);
         return player.amountOfItem(item.name) > 0 && item.canUse(pokemon);
-      })
-    );
+      });
+    });
 
     _whenReady(canGiveHeldItem, function() {
       for (const pokemon of pokemons()) {
