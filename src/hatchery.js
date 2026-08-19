@@ -18,8 +18,7 @@ const automateHatchery = (() => {
     const eggSlots = App.game.breeding.eggList;
     const subscriptions = Array(eggSlots.length);
     eggSlots.forEach((eggSlot, index) => {
-      hatchEggWhenReady(eggSlot(), index, subscriptions);
-      eggSlot.subscribe((egg) => hatchEggWhenReady(egg, index, subscriptions));
+      _runAndSubscribe(eggSlot, (egg) => hatchEggWhenReady(egg, index, subscriptions));
     });
   }
 
