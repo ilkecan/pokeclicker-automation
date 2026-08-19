@@ -739,15 +739,8 @@ const automateUnderground = (() => {
     }
   }
 
-  function digMine(mine, tools, dischargePatterns) {
+  function digMine(mine, digTick, tools, dischargePatterns) {
     const state = createDigState(mine, tools, dischargePatterns);
-    const digTick = ko.pureComputed(() => {
-      if (!AutomationSettings.getValue(SETTINGS_SECTION, "dig")) {
-        return null;
-      }
-
-      return Math.floor(App.game.statistics.secondsPlayed() / DIG_INTERVAL_SECONDS);
-    });
     const digSubscription = digTick.subscribe((tick) => {
       if (tick !== null) {
         digOnce(state);
@@ -762,6 +755,13 @@ const automateUnderground = (() => {
   }
 
   function dig() {
+    const digTick = ko.pureComputed(() => {
+      if (!AutomationSettings.getValue(SETTINGS_SECTION, "dig")) {
+        return null;
+      }
+
+      return Math.floor(App.game.statistics.secondsPlayed() / DIG_INTERVAL_SECONDS);
+    });
     const tools = {
       chisel: App.game.underground.tools.getTool(UndergroundToolType.Chisel),
       hammer: App.game.underground.tools.getTool(UndergroundToolType.Hammer),
@@ -777,7 +777,7 @@ const automateUnderground = (() => {
 
       const mine = mineObservable();
       const subscription = ko.when(() => mine.timeUntilDiscovery <= 0, () => {
-        subscriptions.push(...digMine(mine, tools, dischargePatterns));
+        subscriptions.push(...digMine(mine, digTick, tools, dischargePatterns));
       });
       subscriptions.push(subscription);
     });
