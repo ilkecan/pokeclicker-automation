@@ -1,6 +1,8 @@
 "use strict";
 
 const automateShop = (() => {
+  const SETTINGS_SECTION = "shop";
+
   function synchronizeItemPrice(item) {
     const multiplier = player.itemMultipliers[item.saveName] || 1;
     item.price(Math.round(item.basePrice * multiplier));
@@ -9,7 +11,7 @@ const automateShop = (() => {
   function buyPokeBall(pokeball, targetAmountPerBall, buyingEnabled) {
     const numBallNeeded = ko.pureComputed(() => targetAmountPerBall[pokeball.name] - App.game.statistics.pokeballsObtained[GameConstants.Pokeball[pokeball.name]]());
     if (numBallNeeded() <= 0) {
-      return;
+      return [];
     }
 
     synchronizeItemPrice(pokeball);
@@ -21,7 +23,8 @@ const automateShop = (() => {
       shouldBuy(),
       canBuy(),
     ]));
-    _whenReady(ready, () => {
+
+    const subscription = _whenReady(ready, () => {
       const currency = App.game.wallet.currencies[pokeball.currency];
       let remaining = numBallNeeded();
 
@@ -36,10 +39,11 @@ const automateShop = (() => {
         remaining--;
       }
     });
+    return [subscription];
   }
 
   function buyPokeBalls() {
-    const buyingEnabled = ko.pureComputed(() => AutomationSettings.getValue("shop", "buyPokeBalls"));
+    const buyingEnabled = ko.pureComputed(() => AutomationSettings.getValue(SETTINGS_SECTION, "buyPokeBalls"));
     const achievements = AchievementHandler.achievementList.filter((achievement) => achievement.property.achievementType === GameConstants.AchievementType["Poke Balls"]);
     const achievementsPerBall = Object.groupBy(achievements, (achievement) => GameConstants.Pokeball[achievement.property.pokeball]);
     const targetAmountPerBall = Object.fromEntries(
@@ -52,16 +56,13 @@ const automateShop = (() => {
     const pokeballs = pokeMartShop.items
       .filter((item) => item instanceof PokeballItem)
       .sort((a, b) => b.basePrice - a.basePrice);
-    for (const pokeball of pokeballs) {
-      buyPokeBall(pokeball, targetAmountPerBall, buyingEnabled);
-    }
-  }
-
-  function automate() {
-    buyPokeBalls();
+    return pokeballs.flatMap((pokeball) => buyPokeBall(pokeball, targetAmountPerBall, buyingEnabled));
   }
 
   return function automateShop() {
-    ko.when(() => ShopHandler.shortcutVisible(), automate);
+    _automate(() => _and([
+      ShopHandler.shortcutVisible(),
+      AutomationSettings.isEnabled(SETTINGS_SECTION),
+    ]), [buyPokeBalls]);
   };
 })();

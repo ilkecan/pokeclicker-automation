@@ -1,20 +1,23 @@
 "use strict";
 
 const automateFarm = (() => {
+  const SETTINGS_SECTION = "farm";
+
   function catchWanderers() {
-    App.game.farming.plotList.forEach((plot) => {
+    const subscriptions = App.game.farming.plotList.map((plot) => {
       const shouldCatch = ko.pureComputed(() => _and([
-        AutomationSettings.getValue("farm", "catchWanderers"),
+        AutomationSettings.getValue(SETTINGS_SECTION, "catchWanderers"),
         plot._wanderer(),
       ]));
-      _whenReady(shouldCatch, () => App.game.farming.handleWanderer(plot));
+      return _whenReady(shouldCatch, () => App.game.farming.handleWanderer(plot));
     });
+    return subscriptions;
   }
 
   function harvestWitheringBerries() {
-    App.game.farming.plotList.forEach((plot) => {
+    const subscriptions = App.game.farming.plotList.map((plot) => {
       const shouldHarvest = ko.pureComputed(() => {
-        if (!AutomationSettings.getValue("farm", "harvestWitheringBerries")) {
+        if (!AutomationSettings.getValue(SETTINGS_SECTION, "harvestWitheringBerries")) {
           return false;
         }
 
@@ -32,16 +35,18 @@ const automateFarm = (() => {
         return remainingGrowth <= growthMultiplier;
       });
 
-      _whenReady(shouldHarvest, () => App.game.farming.harvest(plot.index));
+      return _whenReady(shouldHarvest, () => App.game.farming.harvest(plot.index));
     });
-  }
-
-  function automate() {
-    catchWanderers();
-    harvestWitheringBerries();
+    return subscriptions;
   }
 
   return function automateFarm() {
-    ko.when(() => App.game.farming.canAccess(), automate);
+    _automate(() => _and([
+      App.game.farming.canAccess(),
+      AutomationSettings.isEnabled(SETTINGS_SECTION),
+    ]), [
+      catchWanderers,
+      harvestWitheringBerries,
+    ]);
   };
 })();

@@ -1,6 +1,8 @@
 "use strict";
 
 const automateHatchery = (() => {
+  const SETTINGS_SECTION = "hatchery";
+
   function hatchEggWhenReady(egg, index, subscriptions) {
     subscriptions[index]?.dispose();
     subscriptions[index] = null;
@@ -10,7 +12,7 @@ const automateHatchery = (() => {
     }
 
     const shouldHatch = ko.pureComputed(() => _and([
-      AutomationSettings.getValue("hatchery", "hatchReadyEggs"),
+      AutomationSettings.getValue(SETTINGS_SECTION, "hatchReadyEggs"),
       egg.canHatch(),
       App.game.breeding.hatcheryHelpers.hired().length <= index,
     ]));
@@ -20,14 +22,15 @@ const automateHatchery = (() => {
 
   function hatchEggs() {
     const eggSlots = App.game.breeding.eggList;
-    const subscriptions = Array(eggSlots.length);
-    eggSlots.forEach((eggSlot, index) => {
-      _runAndSubscribe(eggSlot, (egg) => hatchEggWhenReady(egg, index, subscriptions));
-    });
-  }
-
-  function isQueueEmpty() {
-    return App.game.breeding.queueList().length === 0;
+    const eggSubscriptions = Array(eggSlots.length);
+    const slotSubscriptions = eggSlots.map((eggSlot, index) => {
+      return _runAndSubscribe(eggSlot, (egg) => hatchEggWhenReady(egg, index, eggSubscriptions));
+    })
+    return [
+      // `eggSubscriptions` change dynamically, so we need a closure instead of a copied array
+      { dispose() { _disposeAll(eggSubscriptions); } },
+      ...slotSubscriptions,
+    ];
   }
 
   function fillHatchery(queueIsEmpty, hasFreeEggSlot) {
@@ -51,23 +54,25 @@ const automateHatchery = (() => {
   }
 
   function breedPokemons() {
-    const queueIsEmpty = ko.pureComputed(isQueueEmpty);
+    const queueIsEmpty = ko.pureComputed(() => App.game.breeding.queueList().length === 0);
     const hasFreeEggSlot = ko.pureComputed(() => App.game.breeding.hasFreeEggSlot());
     const shouldFillHatchery = ko.pureComputed(() => _and([
-      AutomationSettings.getValue("hatchery", "fillEggSlots"),
+      AutomationSettings.getValue(SETTINGS_SECTION, "fillEggSlots"),
       queueIsEmpty(),
       hasFreeEggSlot(),
     ]));
 
-    _whenReady(shouldFillHatchery, () => fillHatchery(queueIsEmpty, hasFreeEggSlot));
-  }
-
-  function automate() {
-    hatchEggs();
-    breedPokemons();
+    const subscription = _whenReady(shouldFillHatchery, () => fillHatchery(queueIsEmpty, hasFreeEggSlot));
+    return [subscription];
   }
 
   return function automateHatchery() {
-    ko.when(() => App.game.breeding.canAccess(), automate);
+    _automate(() => _and([
+      App.game.breeding.canAccess(),
+      AutomationSettings.isEnabled(SETTINGS_SECTION),
+    ]), [
+      hatchEggs,
+      breedPokemons,
+    ]);
   };
 })();

@@ -1,6 +1,7 @@
 "use strict";
 
 const automateUnderground = (() => {
+  const SETTINGS_SECTION = "underground";
   const DIG_INTERVAL_SECONDS = 1;
 
   // from src/modules/underground/tools/UndergroundTools.ts
@@ -320,16 +321,17 @@ const automateUnderground = (() => {
   }
 
   function trackDischargePatterns() {
-    const unlocked = { patterns: [], totalWeight: 0 };
+    const result = { patterns: [], totalWeight: 0, subscriptions: [] };
 
     for (const pattern of App.game.underground.battery.patterns) {
-      ko.when(() => pattern.canAccess(), () => {
-        unlocked.patterns.push({ weight: pattern.weight, tiles: collapseFrames(pattern.pattern) });
-        unlocked.totalWeight += pattern.weight;
+      const subscription = ko.when(() => pattern.canAccess(), () => {
+        result.patterns.push({ weight: pattern.weight, tiles: collapseFrames(pattern.pattern) });
+        result.totalWeight += pattern.weight;
       });
+      result.subscriptions.push(subscription);
     }
 
-    return unlocked;
+    return result;
   }
 
   function createDigState(mine, tools, dischargePatterns) {
@@ -740,7 +742,7 @@ const automateUnderground = (() => {
   function digMine(mine, tools, dischargePatterns) {
     const state = createDigState(mine, tools, dischargePatterns);
     const digTick = ko.pureComputed(() => {
-      if (!AutomationSettings.getValue("underground", "dig")) {
+      if (!AutomationSettings.getValue(SETTINGS_SECTION, "dig")) {
         return null;
       }
 
@@ -770,14 +772,22 @@ const automateUnderground = (() => {
     const mineObservable = App.game.underground._mine;
     const subscriptions = [];
 
-    _whenReady(mineObservable, () => {
+    const subscription = _whenReady(mineObservable, () => {
       _disposeAll(subscriptions);
 
       const mine = mineObservable();
-      subscriptions.push(ko.when(() => mine.timeUntilDiscovery <= 0, () => {
+      const subscription = ko.when(() => mine.timeUntilDiscovery <= 0, () => {
         subscriptions.push(...digMine(mine, tools, dischargePatterns));
-      }));
+      });
+      subscriptions.push(subscription);
     });
+
+    return [
+      // `subscriptions` & `dischargePatterns.subscriptions` change
+      // dynamically, so we need a closure instead of copied arrays
+      { dispose() { _disposeAll(subscriptions); _disposeAll(dischargePatterns.subscriptions); } },
+      subscription,
+    ];
   }
 
   function flattenQuest(quest) {
@@ -801,7 +811,7 @@ const automateUnderground = (() => {
       ].filter((quest) => quest instanceof GainGemsQuest && quest.inProgress() && quest.progress() < 1);
     });
 
-    for (const gemPlate of gemPlates) {
+    return gemPlates.map((gemPlate) => {
       const amountToSell = ko.pureComputed(() => {
         if (gemPlate.sellLocked()) {
           return 0;
@@ -816,39 +826,42 @@ const automateUnderground = (() => {
       });
 
       const shouldSell = ko.pureComputed(() => _and([
-        AutomationSettings.getValue("underground", "sellGemPlates"),
+        AutomationSettings.getValue(SETTINGS_SECTION, "sellGemPlates"),
         amountToSell() > 0,
       ]));
 
-      _whenReady(shouldSell, () => UndergroundController.sellMineItem(gemPlate, amountToSell()));
-    }
+      return _whenReady(shouldSell, () => UndergroundController.sellMineItem(gemPlate, amountToSell()));
+    });
   }
 
   function sellUndergroundTreasures() {
     const treasures = UndergroundItems.list.filter((item) => item.valueType === UndergroundItemValueType.Diamond);
     const treasuresToSell = treasures.filter((treasure) => ItemList[treasure.itemName].basePrice === Infinity); // exclude Everstone
-    for (const treasure of treasuresToSell) {
+    return treasuresToSell.map((treasure) => {
       const canSell = ko.pureComputed(() => _and([
-        AutomationSettings.getValue("underground", "sellTreasures"),
+        AutomationSettings.getValue(SETTINGS_SECTION, "sellTreasures"),
         treasure.isUnlocked(),
         !treasure.sellLocked(),
         player.itemList[treasure.itemName]() > 0,
       ]));
-      _whenReady(canSell, () => UndergroundTrading.quickSell(treasure));
-    }
+      return _whenReady(canSell, () => UndergroundTrading.quickSell(treasure));
+    });
   }
 
   function sellTreasures() {
-    sellGemPlates();
-    sellUndergroundTreasures();
-  }
-
-  function automate() {
-    dig();
-    sellTreasures();
+    return [
+      ...sellGemPlates(),
+      ...sellUndergroundTreasures(),
+    ];
   }
 
   return function automateUnderground() {
-    ko.when(() => App.game.underground.canAccess(), automate);
+    _automate(() => _and([
+      App.game.underground.canAccess(),
+      AutomationSettings.isEnabled(SETTINGS_SECTION),
+    ]), [
+      dig,
+      sellTreasures,
+    ]);
   };
 })();

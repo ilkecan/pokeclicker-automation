@@ -1,6 +1,8 @@
 "use strict";
 
 const automateItems = (() => {
+  const SETTINGS_SECTION = "items";
+
   function chooseHeldItem(_pokemon) {
     return ItemList.Wonder_Chest;
   }
@@ -18,7 +20,7 @@ const automateItems = (() => {
     const pokemons = ko.pureComputed(pokemonsWithoutHeldItem);
 
     const canGiveHeldItem = ko.pureComputed(() => {
-      if (!AutomationSettings.getValue("items", "giveHeldItems")) {
+      if (!AutomationSettings.getValue(SETTINGS_SECTION, "giveHeldItems")) {
         return false;
       }
 
@@ -28,15 +30,17 @@ const automateItems = (() => {
       });
     });
 
-    _whenReady(canGiveHeldItem, function() {
+    const subscription = _whenReady(canGiveHeldItem, function() {
       for (const pokemon of pokemons()) {
         const item = chooseHeldItem(pokemon);
         pokemon.giveHeldItem(item);
       }
     });
+
+    return [subscription];
   }
 
   return function automateItems() {
-    giveHeldItems();
+    _automate(() => AutomationSettings.isEnabled(SETTINGS_SECTION), [giveHeldItems]);
   };
 })();
