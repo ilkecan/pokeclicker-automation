@@ -2,7 +2,6 @@
 
 const automateUnderground = (() => {
   const SETTINGS_SECTION = "underground";
-  const DIG_INTERVAL_SECONDS = 1;
 
   // from src/modules/underground/tools/UndergroundTools.ts
   const ToolStrength = Object.freeze({
@@ -755,12 +754,13 @@ const automateUnderground = (() => {
   }
 
   function dig() {
+    const digInterval = ko.pureComputed(() => Math.max(GameConstants.WORKCYCLE_TIMEOUT_BASE - GameConstants.WORKCYCLE_TIMEOUT_DECREASE_PER_LEVEL * App.game.underground.undergroundLevel, GameConstants.WORKCYCLE_TIMEOUT_MINIMUM));
     const digTick = ko.pureComputed(() => {
       if (!AutomationSettings.getValue(SETTINGS_SECTION, "dig")) {
         return null;
       }
 
-      return Math.floor(App.game.statistics.secondsPlayed() / DIG_INTERVAL_SECONDS);
+      return Math.floor(App.game.statistics.secondsPlayed() / digInterval());
     });
     const tools = {
       chisel: App.game.underground.tools.getTool(UndergroundToolType.Chisel),
