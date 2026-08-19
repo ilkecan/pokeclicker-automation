@@ -1,6 +1,8 @@
 "use strict";
 
 const automateUnderground = (() => {
+  const DIG_INTERVAL_SECONDS = 1;
+
   // from src/modules/underground/tools/UndergroundTools.ts
   const ToolStrength = Object.freeze({
     BOMB: 2,
@@ -737,7 +739,10 @@ const automateUnderground = (() => {
 
   function digMine(mine, tools, dischargePatterns) {
     const state = createDigState(mine, tools, dischargePatterns);
-    const digSubscription = App.game.statistics.secondsPlayed.subscribe(() => digOnce(state));
+    const digTick = ko.pureComputed(() => {
+      return Math.floor(App.game.statistics.secondsPlayed() / DIG_INTERVAL_SECONDS);
+    });
+    const digSubscription = digTick.subscribe(() => digOnce(state));
 
     return [
       _runAndSubscribe(state.surveyCenters, (centers) => rebuildSurveyedTiles(state, centers)),
