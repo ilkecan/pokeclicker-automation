@@ -20,7 +20,7 @@ function _automate(gate, actions) {
 
 function _disposeAll(subscriptions) {
   for (const subscription of subscriptions) {
-    subscription.dispose();
+    subscription?.dispose();
   }
   subscriptions.length = 0;
 }
