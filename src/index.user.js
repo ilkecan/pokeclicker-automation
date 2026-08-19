@@ -5,6 +5,9 @@
 // @match       pokeclicker://game/index.html
 // @match       file:///home/*/.config/pokeclicker-desktop/pokeclicker-master/docs/index.html
 // @require     common.js
+// @require     settings/definitions.js
+// @require     settings/store.js
+// @require     settings/ui.js
 // @require     farm.js
 // @require     hatchery.js
 // @require     items.js
@@ -21,6 +24,9 @@
 "use strict";
 
 GameLoadState.onLoadState(GameLoadState.states.running, () => {
+  AutomationSettings.initialize();
+  installAutomationSettingsTab();
+
   automateFarm();
   automateHatchery();
   automateItems();
