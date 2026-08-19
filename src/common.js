@@ -4,6 +4,20 @@ function _and(xs) {
   return xs.every(Boolean);
 }
 
+function _automate(gate, actions) {
+  const gateObservable = ko.pureComputed(gate);
+  let subscriptions = [];
+  _runAndSubscribe(gateObservable, (enabled) => {
+    _disposeAll(subscriptions);
+
+    if (enabled) {
+      for (const action of actions) {
+        subscriptions.push(...action());
+      }
+    }
+  });
+}
+
 function _disposeAll(subscriptions) {
   for (const subscription of subscriptions) {
     subscription.dispose();
