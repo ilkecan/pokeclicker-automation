@@ -1,5 +1,9 @@
 "use strict";
 
+function _and(xs) {
+  return xs.every(Boolean);
+}
+
 function _disposeAll(subscriptions) {
   for (const subscription of subscriptions) {
     subscription.dispose();
