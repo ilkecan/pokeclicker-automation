@@ -27,10 +27,12 @@ GameLoadState.onLoadState(GameLoadState.states.running, () => {
   AutomationSettings.initialize();
   installAutomationSettingsTab();
 
-  automateFarm();
-  automateHatchery();
-  automateItems();
-  automateQuests();
-  automateShop();
-  automateUnderground();
+  [
+    farm,
+    hatchery,
+    items,
+    quests,
+    shop,
+    underground,
+  ].forEach((module) => module.automate());
 });

@@ -1,6 +1,6 @@
 "use strict";
 
-const automateQuests = (() => {
+const quests = (() => {
   const SETTINGS_SECTION = "quests";
 
   function claimCompletedQuests() {
@@ -77,7 +77,7 @@ const automateQuests = (() => {
     return [subscription];
   }
 
-  return function automateQuests() {
+  function automate() {
     _automate(() => _and([
       App.game.quests.isDailyQuestsUnlocked(),
       AutomationSettings.isEnabled(SETTINGS_SECTION),
@@ -86,4 +86,8 @@ const automateQuests = (() => {
       startQuests,
     ]);
   };
+
+  return {
+    automate,
+  }
 })();

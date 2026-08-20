@@ -1,6 +1,6 @@
 "use strict";
 
-const automateHatchery = (() => {
+const hatchery = (() => {
   const SETTINGS_SECTION = "hatchery";
 
   function hatchEggWhenReady(egg, index, subscriptions) {
@@ -66,7 +66,7 @@ const automateHatchery = (() => {
     return [subscription];
   }
 
-  return function automateHatchery() {
+  function automate() {
     _automate(() => _and([
       App.game.breeding.canAccess(),
       AutomationSettings.isEnabled(SETTINGS_SECTION),
@@ -75,4 +75,8 @@ const automateHatchery = (() => {
       breedPokemons,
     ]);
   };
+
+  return {
+    automate,
+  }
 })();

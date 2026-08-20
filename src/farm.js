@@ -1,6 +1,6 @@
 "use strict";
 
-const automateFarm = (() => {
+const farm = (() => {
   const SETTINGS_SECTION = "farm";
 
   function catchWanderers() {
@@ -40,7 +40,7 @@ const automateFarm = (() => {
     return subscriptions;
   }
 
-  return function automateFarm() {
+  function automate() {
     _automate(() => _and([
       App.game.farming.canAccess(),
       AutomationSettings.isEnabled(SETTINGS_SECTION),
@@ -49,4 +49,8 @@ const automateFarm = (() => {
       harvestWitheringBerries,
     ]);
   };
+
+  return {
+    automate,
+  }
 })();

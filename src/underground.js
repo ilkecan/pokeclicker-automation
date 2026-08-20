@@ -1,6 +1,6 @@
 "use strict";
 
-const automateUnderground = (() => {
+const underground = (() => {
   const SETTINGS_SECTION = "underground";
 
   // from src/modules/underground/tools/UndergroundTools.ts
@@ -855,7 +855,7 @@ const automateUnderground = (() => {
     ];
   }
 
-  return function automateUnderground() {
+  function automate() {
     _automate(() => _and([
       App.game.underground.canAccess(),
       AutomationSettings.isEnabled(SETTINGS_SECTION),
@@ -864,4 +864,8 @@ const automateUnderground = (() => {
       sellTreasures,
     ]);
   };
+
+  return {
+    automate,
+  }
 })();

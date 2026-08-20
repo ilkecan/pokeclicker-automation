@@ -1,6 +1,6 @@
 "use strict";
 
-const automateShop = (() => {
+const shop = (() => {
   const SETTINGS_SECTION = "shop";
 
   function synchronizeItemPrice(item) {
@@ -59,10 +59,14 @@ const automateShop = (() => {
     return pokeballs.flatMap((pokeball) => buyPokeBall(pokeball, targetAmountPerBall, buyingEnabled));
   }
 
-  return function automateShop() {
+  function automate() {
     _automate(() => _and([
       ShopHandler.shortcutVisible(),
       AutomationSettings.isEnabled(SETTINGS_SECTION),
     ]), [buyPokeBalls]);
   };
+
+  return {
+    automate,
+  }
 })();

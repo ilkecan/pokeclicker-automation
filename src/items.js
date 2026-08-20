@@ -1,6 +1,6 @@
 "use strict";
 
-const automateItems = (() => {
+const items = (() => {
   const SETTINGS_SECTION = "items";
 
   function chooseHeldItem(_pokemon) {
@@ -40,7 +40,11 @@ const automateItems = (() => {
     return [subscription];
   }
 
-  return function automateItems() {
+  function automate() {
     _automate(() => AutomationSettings.isEnabled(SETTINGS_SECTION), [giveHeldItems]);
   };
+
+  return {
+    automate,
+  }
 })();
