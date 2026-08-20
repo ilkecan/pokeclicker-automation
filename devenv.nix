@@ -1,9 +1,16 @@
 {
+  config,
   pkgs,
   ...
 }:
 
 {
+  env = {
+    JUST_JUSTFILE = "${config.env.JUST_WORKING_DIRECTORY}/just/justfile";
+    JUST_ONE = "true";
+    JUST_WORKING_DIRECTORY = config.git.root;
+  };
+
   git-hooks.hooks = {
     comrak.enable = true;
     deadnix.enable = true;

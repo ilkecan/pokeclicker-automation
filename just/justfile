@@ -1,0 +1,10 @@
+#!/usr/bin/env -S just --justfile
+# https://just.systems
+
+set fallback
+
+mod simulator
+
+[private]
+@default:
+    just --list --list-submodules

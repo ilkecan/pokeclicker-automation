@@ -867,5 +867,6 @@ const underground = (() => {
 
   return {
     automate,
+    dig, // for simulation
   }
 })();
