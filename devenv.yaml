@@ -1,0 +1,14 @@
+inputs:
+  git-hooks:
+    url: git-hooks-nix
+    inputs:
+      flake-compat:
+        follows: flake-compat
+      nixpkgs:
+        follows: nixpkgs
+  nixpkgs:
+    url: nixpkgs
+  ## transitive
+  flake-compat:
+    url: flake-compat
+    flake: false
