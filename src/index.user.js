@@ -8,6 +8,7 @@
 // @require     settings/definitions.js
 // @require     settings/store.js
 // @require     settings/ui.js
+// @require     dungeon.js
 // @require     farm.js
 // @require     hatchery.js
 // @require     items.js
@@ -28,6 +29,7 @@ GameLoadState.onLoadState(GameLoadState.states.running, () => {
   installAutomationSettingsTab();
 
   [
+    dungeon,
     farm,
     hatchery,
     items,

@@ -45,6 +45,15 @@ const settingsDefinitions = [
       ],
     },
     {
+      id: "dungeon",
+      label: "Dungeon",
+      defaultValue: true,
+      options: [
+        { id: "searchAllChests", label: "Search for all chests", type: "boolean", defaultValue: true },
+        { id: "fightAllBattles", label: "Fight all battles", type: "boolean", defaultValue: true },
+      ],
+    },
+    {
       id: "underground",
       label: "Underground",
       defaultValue: true,
