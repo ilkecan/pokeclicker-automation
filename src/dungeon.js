@@ -256,19 +256,39 @@ const dungeon = (() => {
     executeDungeonAction(action, map);
   }
 
-  function runDungeon() {
-    const map = DungeonRunner.map;
+  function completeDungeonMap(map) {
     const state = createDungeonState(map);
-    const subscription = _runAndSubscribe(DungeonRunner.timeLeft, () => takeAction(state, map));
-    return [subscription];
+    const actionSubscription = _runAndSubscribe(DungeonRunner.timeLeft, () => takeAction(state, map));
+    const disposeSubscription = ko.when(DungeonRunner.dungeonFinished, () => actionSubscription.dispose());
+
+    return [
+      actionSubscription,
+      disposeSubscription,
+    ];
+  }
+
+  function runDungeon() {
+    const shouldRun = ko.pureComputed(() => _and([
+      App.game.gameState === GameConstants.GameState.dungeon,
+      !DungeonGuides.hired(),
+    ]));
+    let subscriptions = [];
+
+    const subscription = _whenReady(shouldRun, () => {
+      _disposeAll(subscriptions); // almost surely no-op
+
+      subscriptions = completeDungeonMap(DungeonRunner.map);
+    });
+
+    return [
+      subscription,
+      // `subscriptions` change dynamically, so we need a closure instead of a copied array
+      { dispose() { _disposeAll(subscriptions); } },
+    ]
   }
 
   function automate() {
-    _automate(() => _and([
-      AutomationSettings.isEnabled(SETTINGS_SECTION),
-      App.game.gameState === GameConstants.GameState.dungeon,
-      !DungeonGuides.hired(),
-    ]), [runDungeon]);
+    _automate(() => AutomationSettings.isEnabled(SETTINGS_SECTION), [runDungeon]);
   };
 
   return {
