@@ -2,9 +2,57 @@
 # https://just.systems
 
 set fallback
+set script-interpreter := ["nu"]
+set shell := ["nu", "-c"]
+
+session := "pokeclicker"
+zellij_dir := "zellij"
+zellij_config := zellij_dir / "config.kdl"
+zellij_layout := zellij_dir / "layout.kdl"
 
 mod simulator
 
 [private]
 @default:
-    just --list --list-submodules
+  just --list --list-submodules
+
+[script]
+log:
+  with-env {
+    ZELLIJ: null
+    ZELLIJ_SESSION_NAME: null
+  } {
+    zellij --config {{zellij_config}} attach {{session}}
+  }
+
+[script]
+run:
+  let session = "{{session}}"
+  let session_info = (
+    zellij list-sessions --no-formatting
+    | lines
+    | where {|line| ($line | split words | first) == $session}
+  )
+  let session_exists = $session_info | is-not-empty
+
+  if $session_exists {
+    let session_has_game = (
+      zellij --session $session action list-panes
+      | lines
+      | any {|line| $line | str contains "pokeclicker"}
+    )
+
+    if $session_has_game {
+      print "Game is already running."
+      exit 0
+    }
+
+    zellij delete-session $session --force
+  }
+
+  with-env {
+    ZELLIJ: null
+    ZELLIJ_SESSION_NAME: null
+  } {
+    zellij --config {{zellij_config}} --layout {{zellij_layout}} attach --create-background $session
+  }

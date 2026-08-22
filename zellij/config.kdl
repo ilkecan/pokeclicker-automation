@@ -1,0 +1,7 @@
+default_mode "locked"
+
+keybinds clear-defaults=true {
+  locked {
+    bind "Ctrl c" { Detach; }
+  }
+}

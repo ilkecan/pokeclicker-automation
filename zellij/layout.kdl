@@ -1,0 +1,7 @@
+show_startup_tips false
+
+layout {
+  pane close_on_exit=true command="env" name="pokeclicker" {
+    args "NODE_OPTIONS=--require=./inject.cjs" "pokeclicker-desktop"
+  }
+}
