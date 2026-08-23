@@ -51,6 +51,8 @@ const settingsDefinitions = [
       options: [
         { id: "searchAllChests", label: "Search for all chests", type: "boolean", defaultValue: true },
         { id: "fightAllBattles", label: "Fight all battles", type: "boolean", defaultValue: true },
+        { id: "restartUponWin", label: "Restart the dungeon upon win", type: "boolean", defaultValue: true },
+        { id: "restartUponLoss", label: "Restart the dungeon upon lost", type: "boolean", defaultValue: true },
       ],
     },
     {

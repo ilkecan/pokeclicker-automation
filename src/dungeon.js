@@ -287,8 +287,45 @@ const dungeon = (() => {
     ]
   }
 
+  function enterDungeon() {
+    DungeonRunner.initializeDungeon(player.town.dungeon);
+  }
+
+  function restartDungeonUponWin() {
+    const shouldEnter = ko.pureComputed(() => _and([
+      !DungeonGuides.hired(),
+      AutomationSettings.getValue(SETTINGS_SECTION, "restartUponWin"),
+      DungeonRunner.dungeonFinished(),
+      DungeonRunner.map?.currentTile().type() !== GameConstants.DungeonTileType.entrance,
+      DungeonRunner.timeLeft() > 0,
+    ]))
+    const subscription = _whenReady(shouldEnter, enterDungeon);
+    return [subscription];
+  }
+
+  function restartDungeonUponLoss() {
+    const shouldEnter = ko.pureComputed(() => _and([
+      !DungeonGuides.hired(),
+      AutomationSettings.getValue(SETTINGS_SECTION, "restartUponLoss"),
+      DungeonRunner.dungeonFinished(),
+      DungeonRunner.timeLeft() <= 0,
+    ]))
+    const subscription = _whenReady(shouldEnter, enterDungeon);
+    return [subscription];
+  }
+
+  function restartDungeon() {
+    return [
+      ...restartDungeonUponLoss(),
+      ...restartDungeonUponWin(),
+    ];
+  }
+
   function automate() {
-    _automate(() => AutomationSettings.isEnabled(SETTINGS_SECTION), [runDungeon]);
+    _automate(() => AutomationSettings.isEnabled(SETTINGS_SECTION), [
+      restartDungeon,
+      runDungeon,
+    ]);
   };
 
   return {
