@@ -2,12 +2,31 @@
 
 const settingsDefinitions = [
     {
+      id: "dungeon",
+      label: "Dungeon",
+      defaultValue: true,
+      options: [
+        { id: "searchAllChests", label: "Search for all chests", type: "boolean", defaultValue: true },
+        { id: "fightAllBattles", label: "Fight all battles", type: "boolean", defaultValue: true },
+        { id: "restartUponWin", label: "Restart the dungeon upon win", type: "boolean", defaultValue: true },
+        { id: "restartUponLoss", label: "Restart the dungeon upon lost", type: "boolean", defaultValue: true },
+      ],
+    },
+    {
       id: "farm",
       label: "Farm",
       defaultValue: true,
       options: [
         { id: "catchWanderers", label: "Catch wanderers", type: "boolean", defaultValue: true },
         { id: "harvestWitheringBerries", label: "Harvest berries before they wither", type: "boolean", defaultValue: true },
+      ],
+    },
+    {
+      id: "gym",
+      label: "Gym",
+      defaultValue: true,
+      options: [
+        { id: "autoRestart", label: "Auto Restart Gym", type: "boolean", defaultValue: true },
       ],
     },
     {
@@ -42,17 +61,6 @@ const settingsDefinitions = [
       defaultValue: true,
       options: [
         { id: "buyPokeBalls", label: "Buy Poke Balls for achievements", type: "boolean", defaultValue: true },
-      ],
-    },
-    {
-      id: "dungeon",
-      label: "Dungeon",
-      defaultValue: true,
-      options: [
-        { id: "searchAllChests", label: "Search for all chests", type: "boolean", defaultValue: true },
-        { id: "fightAllBattles", label: "Fight all battles", type: "boolean", defaultValue: true },
-        { id: "restartUponWin", label: "Restart the dungeon upon win", type: "boolean", defaultValue: true },
-        { id: "restartUponLoss", label: "Restart the dungeon upon lost", type: "boolean", defaultValue: true },
       ],
     },
     {

@@ -10,6 +10,7 @@
 // @require     settings/ui.js
 // @require     dungeon.js
 // @require     farm.js
+// @require     gym.js
 // @require     hatchery.js
 // @require     items.js
 // @require     quests.js
@@ -31,6 +32,7 @@ GameLoadState.onLoadState(GameLoadState.states.running, () => {
   [
     dungeon,
     farm,
+    gym,
     hatchery,
     items,
     quests,
