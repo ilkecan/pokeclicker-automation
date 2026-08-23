@@ -292,36 +292,30 @@ const dungeon = (() => {
     DungeonRunner.initializeDungeon(player.town.dungeon);
   }
 
-  function restartDungeonUponWin() {
-    const shouldEnter = ko.pureComputed(() => _and([
-      !DungeonGuides.hired(),
-      App.game.gameState !== GameConstants.GameState.dungeon,
-      AutomationSettings.getValue(SETTINGS_SECTION, "restartUponWin"),
-      DungeonRunner.dungeonFinished(),
-      DungeonRunner.map?.currentTile().type() !== GameConstants.DungeonTileType.entrance,
-      DungeonRunner.timeLeft() > 0,
-    ]))
-    const subscription = _whenReady(shouldEnter, enterDungeon);
-    return [subscription];
-  }
-
-  function restartDungeonUponLoss() {
-    const shouldEnter = ko.pureComputed(() => _and([
-      !DungeonGuides.hired(),
-      App.game.gameState !== GameConstants.GameState.dungeon,
-      AutomationSettings.getValue(SETTINGS_SECTION, "restartUponLoss"),
-      DungeonRunner.dungeonFinished(),
-      DungeonRunner.timeLeft() <= 0,
-    ]))
-    const subscription = _whenReady(shouldEnter, enterDungeon);
-    return [subscription];
-  }
-
   function restartDungeon() {
-    return [
-      ...restartDungeonUponLoss(),
-      ...restartDungeonUponWin(),
-    ];
+    const canStart = ko.pureComputed(() => _and([
+      !DungeonGuides.hired(),
+      App.game.gameState !== GameConstants.GameState.dungeon,
+      DungeonRunner.dungeonFinished(),
+    ]));
+
+    const subscription = _whenReady(canStart, () => {
+      if (DungeonRunner.timeLeft() <= 0) {
+        if (AutomationSettings.getValue(SETTINGS_SECTION, "restartUponLoss")) {
+          enterDungeon();
+        }
+      } else {
+        if (DungeonRunner.map?.currentTile().type() === GameConstants.DungeonTileType.entrance) {
+          // dungeon left
+          return;
+        }
+
+        if (AutomationSettings.getValue(SETTINGS_SECTION, "restartUponWin")) {
+          enterDungeon();
+        }
+      }
+    });
+    return [subscription];
   }
 
   function automate() {
