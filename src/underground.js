@@ -468,8 +468,15 @@ const underground = (() => {
   }
 
   function trySurvey(state) {
-    const { mine, tools } = state;
+    const { mine, tools, surveyCenters } = state;
     if (!tools.survey.canUseTool()) {
+      return false;
+    }
+
+    // Without proper valuation of "information" from tiles, we have to special
+    // handle the survey. Only use it when there are no surveyed tiles to
+    // prevent most actions being used for surveying.
+    if (surveyCenters().length > 0) {
       return false;
     }
 
