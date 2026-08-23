@@ -43,7 +43,7 @@ const shop = (() => {
   }
 
   function buyPokeBalls() {
-    const buyingEnabled = ko.pureComputed(() => AutomationSettings.getValue(SETTINGS_SECTION, "buyPokeBalls"));
+    const buyingEnabled = AutomationSettings.value(SETTINGS_SECTION, "buyPokeBalls");
     const achievements = AchievementHandler.achievementList.filter((achievement) => achievement.property.achievementType === GameConstants.AchievementType["Poke Balls"]);
     const achievementsPerBall = Object.groupBy(achievements, (achievement) => GameConstants.Pokeball[achievement.property.pokeball]);
     const targetAmountPerBall = Object.fromEntries(

@@ -69,12 +69,20 @@ const AutomationSettings = (() => {
     return option;
   }
 
+  function enabled(sectionId) {
+    return getSection(sectionId).enabled;
+  }
+
   function isEnabled(sectionId) {
-    return getSection(sectionId).enabled();
+    return enabled(sectionId)();
+  }
+
+  function value(sectionId, optionId) {
+    return getOption(getSection(sectionId), optionId).value;
   }
 
   function getValue(sectionId, optionId) {
-    return getOption(getSection(sectionId), optionId).value();
+    return value(sectionId, optionId)();
   }
 
   function capture() {
@@ -208,10 +216,12 @@ const AutomationSettings = (() => {
   }
 
   return {
+    enabled,
     getValue,
     initialize,
     isEnabled,
     reset,
     sections,
+    value,
   };
 })();

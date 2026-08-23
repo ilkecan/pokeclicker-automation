@@ -41,7 +41,7 @@ const items = (() => {
   }
 
   function automate() {
-    _automate(() => AutomationSettings.isEnabled(SETTINGS_SECTION), [giveHeldItems]);
+    _automate(AutomationSettings.enabled(SETTINGS_SECTION), [giveHeldItems]);
   };
 
   return {

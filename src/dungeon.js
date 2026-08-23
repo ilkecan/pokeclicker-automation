@@ -319,7 +319,7 @@ const dungeon = (() => {
   }
 
   function automate() {
-    _automate(() => AutomationSettings.isEnabled(SETTINGS_SECTION), [
+    _automate(AutomationSettings.enabled(SETTINGS_SECTION), [
       restartDungeon,
       runDungeon,
     ]);
