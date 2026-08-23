@@ -269,8 +269,9 @@ const dungeon = (() => {
 
   function runDungeon() {
     const shouldRun = ko.pureComputed(() => _and([
-      App.game.gameState === GameConstants.GameState.dungeon,
       !DungeonGuides.hired(),
+      App.game.gameState === GameConstants.GameState.dungeon,
+      DungeonRunner.timeLeftPercentage() >= 100,
     ]));
     let subscriptions = [];
 
@@ -294,6 +295,7 @@ const dungeon = (() => {
   function restartDungeonUponWin() {
     const shouldEnter = ko.pureComputed(() => _and([
       !DungeonGuides.hired(),
+      App.game.gameState !== GameConstants.GameState.dungeon,
       AutomationSettings.getValue(SETTINGS_SECTION, "restartUponWin"),
       DungeonRunner.dungeonFinished(),
       DungeonRunner.map?.currentTile().type() !== GameConstants.DungeonTileType.entrance,
@@ -306,6 +308,7 @@ const dungeon = (() => {
   function restartDungeonUponLoss() {
     const shouldEnter = ko.pureComputed(() => _and([
       !DungeonGuides.hired(),
+      App.game.gameState !== GameConstants.GameState.dungeon,
       AutomationSettings.getValue(SETTINGS_SECTION, "restartUponLoss"),
       DungeonRunner.dungeonFinished(),
       DungeonRunner.timeLeft() <= 0,
