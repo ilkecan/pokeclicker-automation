@@ -36,15 +36,19 @@ run:
   let session_exists = $session_info | is-not-empty
 
   if $session_exists {
-    let session_has_game = (
-      zellij --session $session action list-panes
-      | lines
-      | any {|line| $line | str contains "pokeclicker"}
-    )
+    let is_exited = $session_info | any {|line| $line | str contains "EXITED"}
 
-    if $session_has_game {
-      print "Game is already running."
-      exit 0
+    if not $is_exited {
+      let session_has_game = (
+        zellij --session $session action list-panes
+        | lines
+        | any {|line| $line | str contains "pokeclicker"}
+      )
+
+      if $session_has_game {
+        print "Game is already running."
+        exit 0
+      }
     }
 
     zellij delete-session $session --force
