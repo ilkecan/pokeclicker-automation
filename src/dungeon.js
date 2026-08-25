@@ -101,17 +101,17 @@ const dungeon = (() => {
     return a.x === b.x && a.y === b.y && a.floor === b.floor;
   }
 
-  function hasVisitedNeighbor(state, tile) {
+  function hasVisitedNeighbour(state, tile) {
     const floor = state.board[tile.floor];
     return DIRECTIONS.some((direction) => {
-      // the "neighbor" may be outside the floor at the edge
-      const neighbor = floor[tile.y + direction.y]?.[tile.x + direction.x];
-      return neighbor?.isVisited;
+      // the "neighbour" may be outside the floor at the edge
+      const neighbour = floor[tile.y + direction.y]?.[tile.x + direction.x];
+      return neighbour?.isVisited;
     });
   }
 
   function isAccessible(state, tile) {
-    return tile.isVisited || hasVisitedNeighbor(state, tile);
+    return tile.isVisited || hasVisitedNeighbour(state, tile);
   }
 
   function findTile(state, predicate) {
@@ -169,11 +169,11 @@ const dungeon = (() => {
     ]));
   }
 
-  function accessibleNeighborGain(state, tile) {
+  function accessibleNeighbourGain(state, tile) {
     const floor = state.board[tile.floor];
     return DIRECTIONS.reduce((count, direction) => {
-      const neighbor = floor[tile.y + direction.y]?.[tile.x + direction.x];
-      return count + Boolean(neighbor && !isAccessible(state, neighbor));
+      const neighbour = floor[tile.y + direction.y]?.[tile.x + direction.x];
+      return count + Boolean(neighbour && !isAccessible(state, neighbour));
     }, 0);
   }
 
@@ -206,11 +206,11 @@ const dungeon = (() => {
     const unseenBattleChance = unseenBattleProbability(state);
 
     for (const tile of state.allTiles[state.position.floor]) {
-      if (tile.isVisited || !hasVisitedNeighbor(state, tile)) {
+      if (tile.isVisited || !hasVisitedNeighbour(state, tile)) {
         continue;
       }
 
-      const score = accessibleNeighborGain(state, tile) / frontierTime(tile, unseenBattleChance);
+      const score = accessibleNeighbourGain(state, tile) / frontierTime(tile, unseenBattleChance);
       if (score >= bestScore) {
         bestTile = tile;
         bestScore = score;
