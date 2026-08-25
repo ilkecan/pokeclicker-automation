@@ -58,6 +58,7 @@ const dungeon = (() => {
       chestsOpened: map.floorSizes.map(() => 0),
       battlesWon: map.floorSizes.map(() => 0),
       encountersWon: 0,
+      progression: null,
       board,
       allTiles: board.map((floor) => floor.flat()),
     };
@@ -98,6 +99,7 @@ const dungeon = (() => {
     for (const tileState of state.allTiles[floorIndex]) {
       updateTileState(tileState, floor[tileState.y][tileState.x]);
     }
+    state.progression = progressionTile(state);
   }
 
   function samePosition(a, b) {
@@ -163,24 +165,25 @@ const dungeon = (() => {
     return findTileByType(state, type);
   }
 
-  function allTargetsVisible(state, progression) {
-    const floor = state.position.floor;
+  function allTargetsVisible(state) {
+    const { battlesWon, chestsOpened, options, position, progression, targetCounts } = state;
+    const floor = position.floor;
     const tiles = state.allTiles[floor];
 
     if (!progression) {
       return false;
     }
 
-    if (state.options.searchAllChests) {
+    if (options.searchAllChests) {
       const visibleChests = countTilesByType(tiles, GameConstants.DungeonTileType.chest);
-      if (state.chestsOpened[floor] + visibleChests < state.targetCounts[floor].chests) {
+      if (chestsOpened[floor] + visibleChests < targetCounts[floor].chests) {
         return false;
       }
     }
 
-    if (state.options.fightAllBattles) {
+    if (options.fightAllBattles) {
       const visibleBattles = countTilesByType(tiles, GameConstants.DungeonTileType.enemy);
-      if (state.battlesWon[floor] + visibleBattles < state.targetCounts[floor].battles) {
+      if (battlesWon[floor] + visibleBattles < targetCounts[floor].battles) {
         return false;
       }
     }
@@ -231,19 +234,20 @@ const dungeon = (() => {
     return moveAction(nextTile);
   }
 
-  function findVisibleInaccessibleTarget(state, progression) {
+  function findVisibleInaccessibleTarget(state) {
+    const { options, progression } = state;
     if (progression?.isVisible && !isAccessible(state, progression)) {
       return progression;
     }
 
-    if (state.options.fightAllBattles) {
+    if (options.fightAllBattles) {
       const battle = findTileByType(state, GameConstants.DungeonTileType.enemy, VISIBLE_INACCESSIBLE_TILE_OPTIONS);
       if (battle) {
         return battle;
       }
     }
 
-    if (state.options.searchAllChests) {
+    if (options.searchAllChests) {
       const chest = findTileByType(state, GameConstants.DungeonTileType.chest, VISIBLE_INACCESSIBLE_TILE_OPTIONS);
       if (chest) {
         return chest;
@@ -252,16 +256,16 @@ const dungeon = (() => {
   }
 
   function chooseDungeonAction(state) {
-    const progression = progressionTile(state);
-    if (!allTargetsVisible(state, progression)) {
-      const target = findVisibleInaccessibleTarget(state, progression);
+    const { options, progression, position } = state;
+    if (!allTargetsVisible(state)) {
+      const target = findVisibleInaccessibleTarget(state);
       if (target) {
         return followTarget(state, target);
       }
       return exploreUnseen(state);
     }
 
-    if (state.options.fightAllBattles) {
+    if (options.fightAllBattles) {
       const battle = findTileByType(state, GameConstants.DungeonTileType.enemy, { accessible: true });
       if (battle) {
         return moveAction(battle);
@@ -275,9 +279,9 @@ const dungeon = (() => {
     // open accessible chests regardless of the `searchAllChests` option
     const chest = findTileByType(state, GameConstants.DungeonTileType.chest, { accessible: true });
     if (chest) {
-      return samePosition(state.position, chest) ? interactAction(Interaction.CHEST) : moveAction(chest);
+      return samePosition(position, chest) ? interactAction(Interaction.CHEST) : moveAction(chest);
     }
-    if (state.options.searchAllChests) {
+    if (options.searchAllChests) {
       const inaccessibleChest = findTileByType(state, GameConstants.DungeonTileType.chest);
       if (inaccessibleChest) {
         return followTarget(state, inaccessibleChest);
@@ -285,7 +289,7 @@ const dungeon = (() => {
     }
 
     if (isAccessible(state, progression)) {
-      if (!samePosition(state.position, progression)) {
+      if (!samePosition(position, progression)) {
         return moveAction(progression);
       }
       return interactAction(progression.type === GameConstants.DungeonTileType.boss ? Interaction.BOSS : Interaction.LADDER);
