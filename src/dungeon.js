@@ -276,6 +276,11 @@ const dungeon = (() => {
       return exploreUnseen(state);
     }
 
+    if (!isAccessible(state, progression)) {
+      // prioritize finding the progression tile first
+      return followTarget(state, progression);
+    }
+
     if (options.fightAllBattles) {
       const battle = findTileByType(state, GameConstants.DungeonTileType.enemy, { accessible: true });
       if (battle) {
@@ -299,14 +304,10 @@ const dungeon = (() => {
       }
     }
 
-    if (isAccessible(state, progression)) {
-      if (!samePosition(position, progression)) {
-        return moveAction(progression);
-      }
-      return progressAction(progression);
+    if (!samePosition(position, progression)) {
+      return moveAction(progression);
     }
-
-    return followTarget(state, progression);
+    return progressAction(progression);
   }
 
   function executeDungeonAction(action, map) {
