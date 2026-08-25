@@ -162,8 +162,16 @@ const dungeon = (() => {
     }
   }
 
+  function findUnvisitedNonBattleNeighbour(state) {
+    return findTile(state, (tile) => _and([
+      !tile.isVisited,
+      isAccessible(state, tile),
+      tile.isVisible,
+      tile.type !== GameConstants.DungeonTileType.enemy,
+    ]));
+  }
+
   function exploreUnseen(state) {
-    let unseen;
     let frontier;
 
     for (const tile of state.allTiles[state.position.floor]) {
@@ -174,17 +182,12 @@ const dungeon = (() => {
       frontier = tile;
 
       if (!tile.isVisible) {
-        unseen = tile;
-      } else {
-        if (tile.type !== GameConstants.DungeonTileType.enemy) {
-          // prefer non-battle and early return as it is the best scenario
-          return moveAction(tile);
-        }
+        // prefer unseen as it has a chance to be non-battle
+        return moveAction(tile);
       }
     }
 
-    // prefer unseen as it has a chance to be non-battle
-    return moveAction(unseen || frontier);
+    return moveAction(frontier);
   }
 
   function progressionTile(state) {
@@ -286,6 +289,13 @@ const dungeon = (() => {
 
   function chooseDungeonAction(state) {
     const { options, progression, position } = state;
+
+    const unvisitedNonBattleNeighbour = findUnvisitedNonBattleNeighbour(state);
+    if (unvisitedNonBattleNeighbour) {
+      // prefer non-battle tiles
+      return moveAction(unvisitedNonBattleNeighbour);
+    }
+
     if (!allTargetsVisible(state)) {
       const target = findVisibleInaccessibleTarget(state);
       if (target) {
