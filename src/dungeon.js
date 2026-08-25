@@ -151,6 +151,17 @@ const dungeon = (() => {
     };
   }
 
+  function progressAction(progression) {
+    switch (progression.type) {
+      case GameConstants.DungeonTileType.boss:
+        return interactAction(Interaction.BOSS);
+      case GameConstants.DungeonTileType.ladder:
+        return interactAction(Interaction.LADDER);
+      default:
+        console.error("dungeon: unknown progression tile!");
+    }
+  }
+
   function exploreUnseen(state) {
     const isFrontier = (tile) => !tile.isVisited && isAccessible(state, tile);
     const tile = findTile(state, (candidate) => !candidate.isVisible && isFrontier(candidate))
@@ -292,7 +303,7 @@ const dungeon = (() => {
       if (!samePosition(position, progression)) {
         return moveAction(progression);
       }
-      return interactAction(progression.type === GameConstants.DungeonTileType.boss ? Interaction.BOSS : Interaction.LADDER);
+      return progressAction(progression);
     }
 
     return followTarget(state, progression);
