@@ -21,11 +21,6 @@ const dungeon = (() => {
     INTERACT: "interact",
   });
 
-  const VISIBLE_INACCESSIBLE_TILE_OPTIONS = Object.freeze({
-    accessible: false,
-    visible: true,
-  });
-
   function createTileState(x, y, floor) {
     return {
       x,
@@ -134,6 +129,9 @@ const dungeon = (() => {
       (visible === undefined || tile.isVisible === visible)
     );
   }
+  function findInaccessibleTileByType(state, type) {
+    return findTileByType(state, type, { accessible: false });
+  }
 
   function moveAction(tile) {
     return {
@@ -171,7 +169,7 @@ const dungeon = (() => {
     ]));
   }
 
-  function exploreUnseen(state) {
+  function exploreFrontier(state) {
     let frontier;
 
     for (const tile of state.allTiles[state.position.floor]) {
@@ -273,14 +271,14 @@ const dungeon = (() => {
     }
 
     if (options.fightAllBattles) {
-      const battle = findTileByType(state, GameConstants.DungeonTileType.enemy, VISIBLE_INACCESSIBLE_TILE_OPTIONS);
+      const battle = findInaccessibleTileByType(state, GameConstants.DungeonTileType.enemy);
       if (battle) {
         return battle;
       }
     }
 
     if (options.searchAllChests) {
-      const chest = findTileByType(state, GameConstants.DungeonTileType.chest, VISIBLE_INACCESSIBLE_TILE_OPTIONS);
+      const chest = findInaccessibleTileByType(state, GameConstants.DungeonTileType.chest);
       if (chest) {
         return chest;
       }
@@ -301,7 +299,7 @@ const dungeon = (() => {
       if (target) {
         return followTarget(state, target);
       }
-      return exploreUnseen(state);
+      return exploreFrontier(state);
     }
 
     if (!isAccessible(state, progression)) {
@@ -320,16 +318,18 @@ const dungeon = (() => {
       }
     }
 
+    if (options.searchAllChests) {
+      // make all known chests accessible before opening any of them
+      const inaccessibleChest = findInaccessibleTileByType(state, GameConstants.DungeonTileType.chest);
+      if (inaccessibleChest) {
+        return followTarget(state, inaccessibleChest);
+      }
+    }
+
     // open accessible chests regardless of the `searchAllChests` option
     const chest = findTileByType(state, GameConstants.DungeonTileType.chest, { accessible: true });
     if (chest) {
       return samePosition(position, chest) ? interactAction(Interaction.CHEST) : moveAction(chest);
-    }
-    if (options.searchAllChests) {
-      const inaccessibleChest = findTileByType(state, GameConstants.DungeonTileType.chest);
-      if (inaccessibleChest) {
-        return followTarget(state, inaccessibleChest);
-      }
     }
 
     if (!samePosition(position, progression)) {
