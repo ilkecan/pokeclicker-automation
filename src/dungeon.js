@@ -169,23 +169,55 @@ const dungeon = (() => {
     ]));
   }
 
+  function accessibleNeighborGain(state, tile) {
+    const floor = state.board[tile.floor];
+    return DIRECTIONS.reduce((count, direction) => {
+      const neighbor = floor[tile.y + direction.y]?.[tile.x + direction.x];
+      return count + Boolean(neighbor && !isAccessible(state, neighbor));
+    }, 0);
+  }
+
+  function unseenBattleProbability(state) {
+    const floor = state.position.floor;
+    const tiles = state.allTiles[floor];
+    const unknownTileCount = tiles.reduce((count, tile) => count + !tile.isVisible, 0);
+    if (!unknownTileCount) {
+      return 0;
+    }
+
+    const knownBattleCount = countTilesByType(tiles, GameConstants.DungeonTileType.enemy);
+    const remainingBattleCount = state.targetCounts[floor].battles - state.battlesWon[floor] - knownBattleCount;
+    return remainingBattleCount / unknownTileCount;
+  }
+
+  function frontierTime(tile, unseenBattleChance) {
+    // Even in the best case scenario where the battle takes 1 battle tick, the
+    // score still prefers battle tiles only if there isn't any non-battle tile
+    // with any neighbour gain. So there is no need to track the actual battle
+    // time.
+    const battleChance = tile.type === GameConstants.DungeonTileType.enemy ? 1 : unseenBattleChance;
+    return GameConstants.DUNGEON_TICK +
+      battleChance * (GameConstants.BATTLE_TICK - GameConstants.DUNGEON_TICK);
+  }
+
   function exploreFrontier(state) {
-    let frontier;
+    let bestTile;
+    let bestScore = 0;
+    const unseenBattleChance = unseenBattleProbability(state);
 
     for (const tile of state.allTiles[state.position.floor]) {
       if (tile.isVisited || !hasVisitedNeighbor(state, tile)) {
         continue;
       }
 
-      frontier = tile;
-
-      if (!tile.isVisible) {
-        // prefer unseen as it has a chance to be non-battle
-        return moveAction(tile);
+      const score = accessibleNeighborGain(state, tile) / frontierTime(tile, unseenBattleChance);
+      if (score >= bestScore) {
+        bestTile = tile;
+        bestScore = score;
       }
     }
 
-    return moveAction(frontier);
+    return moveAction(bestTile);
   }
 
   function progressionTile(state) {
