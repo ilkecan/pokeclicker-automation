@@ -6,10 +6,11 @@ const settingsDefinitions = [
       label: "Dungeon",
       defaultValue: true,
       options: [
-        { id: "searchAllChests", label: "Search for all chests", type: "boolean", defaultValue: true },
         { id: "fightAllBattles", label: "Fight all battles", type: "boolean", defaultValue: true },
-        { id: "restartUponWin", label: "Restart the dungeon upon win", type: "boolean", defaultValue: true },
+        { id: "openAccessibleChests", label: "Open accessible chests before progressing", type: "boolean", defaultValue: true },
         { id: "restartUponLoss", label: "Restart the dungeon upon lost", type: "boolean", defaultValue: true },
+        { id: "restartUponWin", label: "Restart the dungeon upon win", type: "boolean", defaultValue: true },
+        { id: "searchAllChests", label: "Search for all chests", type: "boolean", defaultValue: true },
       ],
     },
     {
@@ -26,7 +27,7 @@ const settingsDefinitions = [
       label: "Gym",
       defaultValue: true,
       options: [
-        { id: "autoRestart", label: "Auto Restart Gym", type: "boolean", defaultValue: true },
+        { id: "autoRestart", label: "Auto restart gym", type: "boolean", defaultValue: true },
       ],
     },
     {
@@ -34,8 +35,8 @@ const settingsDefinitions = [
       label: "Hatchery",
       defaultValue: true,
       options: [
-        { id: "hatchReadyEggs", label: "Hatch ready eggs", type: "boolean", defaultValue: true },
         { id: "fillEggSlots", label: "Fill empty egg slots", type: "boolean", defaultValue: true },
+        { id: "hatchReadyEggs", label: "Hatch ready eggs", type: "boolean", defaultValue: true },
       ],
     },
     {

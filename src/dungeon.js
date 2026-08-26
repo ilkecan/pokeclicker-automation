@@ -76,8 +76,9 @@ const dungeon = (() => {
   }
 
   function updateDungeonState(state, map) {
-    state.options.searchAllChests = AutomationSettings.getValue(SETTINGS_SECTION, "searchAllChests");
     state.options.fightAllBattles = AutomationSettings.getValue(SETTINGS_SECTION, "fightAllBattles");
+    state.options.openAccessibleChests = AutomationSettings.getValue(SETTINGS_SECTION, "openAccessibleChests");
+    state.options.searchAllChests = AutomationSettings.getValue(SETTINGS_SECTION, "searchAllChests");
 
     const point = map.playerPosition();
     state.position.x = point.x;
@@ -358,10 +359,11 @@ const dungeon = (() => {
       }
     }
 
-    // open accessible chests regardless of the `searchAllChests` option
-    const chest = findTileByType(state, GameConstants.DungeonTileType.chest, { accessible: true });
-    if (chest) {
-      return samePosition(position, chest) ? interactAction(Interaction.CHEST) : moveAction(chest);
+    if (options.openAccessibleChests) {
+      const chest = findTileByType(state, GameConstants.DungeonTileType.chest, { accessible: true });
+      if (chest) {
+        return samePosition(position, chest) ? interactAction(Interaction.CHEST) : moveAction(chest);
+      }
     }
 
     if (!samePosition(position, progression)) {
