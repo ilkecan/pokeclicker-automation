@@ -143,8 +143,7 @@ const hatchery = (() => {
     return types;
   }
 
-  function* pokerusCandidates() {
-    const hatchables = getHatchablePokemons();
+  function* pokerusCandidates(hatchables, uninfectedCandidates) {
     const inHatchery = getPokerusEligiblePokemonsInHatchery();
     const uninfectedsInHatchery = inHatchery.filter((pokemon) => pokemon.pokerus === GameConstants.Pokerus.Uninfected);
     const spreadingTypes = getSpreadingTypes(inHatchery);
@@ -165,8 +164,7 @@ const hatchery = (() => {
         continue;
       }
 
-      const uninfectedCandidates = hatchables.values().filter((pokemon) => pokemon.pokerus === GameConstants.Pokerus.Uninfected);
-      const seedSpreader = findMostProductiveSpreader(hatchables, spreadingTypes, Array.from(uninfectedCandidates));
+      const seedSpreader = findMostProductiveSpreader(hatchables, spreadingTypes, uninfectedCandidates);
       if (seedSpreader.score === 0) {
         break;
       }
@@ -176,11 +174,17 @@ const hatchery = (() => {
   }
 
   function* candidatesToBreed() {
-    if (_and([
+    const spreadPokerus = _and([
       App.game.keyItems.hasKeyItem(KeyItemType.Pokerus_virus),
       AutomationSettings.getValue(SETTINGS_SECTION, "spreadPokerus"),
-    ])) {
-      yield* pokerusCandidates();
+    ]);
+
+    if (spreadPokerus) {
+      const hatchables = getHatchablePokemons();
+      const uninfectedCandidates = Array.from(hatchables.values().filter((pokemon) => pokemon.pokerus === GameConstants.Pokerus.Uninfected));
+      if (uninfectedCandidates.length !== 0) {
+        yield* pokerusCandidates(hatchables, uninfectedCandidates);
+      }
     }
 
     for (const pokemon of BreedingController.hatcherySortedFilteredList()) {
