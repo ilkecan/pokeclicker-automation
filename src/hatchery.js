@@ -42,12 +42,12 @@ const hatchery = (() => {
     return [dataPokemon.type1, dataPokemon.type2].filter((type) => type !== PokemonType.None);
   }
 
-  function getPokerusEligiblePokemonsInHatchery() {
+  function getPokerusEligiblePokemonsInHatchery({ includeHelperSlots = false } = {}) {
     const eggSlots = App.game.breeding.eggList;
     const helperCount = App.game.breeding.hatcheryHelpers.hired().length;
     const pokemons = [];
 
-    for (let i = helperCount; i < App.game.breeding.eggSlots; i++) {
+    for (let i = includeHelperSlots ? 0 : helperCount; i < App.game.breeding.eggSlots; i++) {
       const egg = eggSlots[i]();
       if (egg.isNone() || egg.canHatch()) {
         continue;
@@ -173,18 +173,11 @@ const hatchery = (() => {
     }
   }
 
-  function* candidatesToBreed() {
-    const spreadPokerus = _and([
-      App.game.keyItems.hasKeyItem(KeyItemType.Pokerus_virus),
-      AutomationSettings.getValue(SETTINGS_SECTION, "spreadPokerus"),
-    ]);
-
+  function* candidatesToBreed(spreadPokerus) {
     if (spreadPokerus) {
       const hatchables = getHatchablePokemons();
       const uninfectedCandidates = Array.from(hatchables.values().filter((pokemon) => pokemon.pokerus === GameConstants.Pokerus.Uninfected));
-      if (uninfectedCandidates.length !== 0) {
-        yield* pokerusCandidates(hatchables, uninfectedCandidates);
-      }
+      yield* pokerusCandidates(hatchables, uninfectedCandidates);
     }
 
     for (const pokemon of BreedingController.hatcherySortedFilteredList()) {
@@ -194,8 +187,9 @@ const hatchery = (() => {
     }
   }
 
-  function fillHatchery(hasFreeEggSlot) {
-    const candidates = candidatesToBreed();
+  function fillHatchery(hasFreeEggSlot, spreadPokerus) {
+    const candidates = candidatesToBreed(spreadPokerus);
+
     while (hasFreeEggSlot()) {
       const { done, value } = candidates.next();
       if (done) {
@@ -206,7 +200,64 @@ const hatchery = (() => {
     }
   }
 
-  function breedPokemons() {
+  function restoreHelpers(autoFiredHelpers) {
+    for (const helper of autoFiredHelpers) {
+      if (helper.hired()) {
+        continue;
+      }
+
+      // the user must have already hired other helper(s)
+      if (!App.game.breeding.hatcheryHelpers.canHire()) {
+        break;
+      }
+
+      helper.hire();
+    }
+
+    autoFiredHelpers.clear();
+  }
+
+  function managePokerusHelpers(spreadPokerus, autoFiredHelpers) {
+    if (spreadPokerus) {
+      for (const helper of App.game.breeding.hatcheryHelpers.hired()) {
+        if (autoFiredHelpers.has(helper)) {
+          continue;
+        }
+
+        autoFiredHelpers.add(helper);
+        helper.fire();
+      }
+    } else {
+      restoreHelpers(autoFiredHelpers);
+    }
+  }
+
+  function manageHelpers(shouldSpreadPokerus) {
+    const autoFiredHelpers = new Set();
+    let pokerusSubscription;
+
+    const disposePokerus = {
+      dispose() {
+        pokerusSubscription?.dispose();
+        restoreHelpers(autoFiredHelpers);
+      }
+    }
+
+    const subscription = _runAndSubscribe(AutomationSettings.value(SETTINGS_SECTION, "manageHelpers"), (manage) => {
+      if (manage) {
+        pokerusSubscription = _runAndSubscribe(shouldSpreadPokerus, (spreadPokerus) => managePokerusHelpers(spreadPokerus, autoFiredHelpers));
+      } else {
+        disposePokerus.dispose();
+      }
+    });
+
+    return [
+      subscription,
+      disposePokerus,
+    ];
+  }
+
+  function breedPokemons(shouldSpreadPokerus) {
     const queueIsEmpty = ko.pureComputed(() => App.game.breeding.queueList().length === 0);
     const hasFreeEggSlot = ko.pureComputed(() => App.game.breeding.hasFreeEggSlot());
     const shouldFillHatchery = ko.pureComputed(() => _and([
@@ -215,17 +266,31 @@ const hatchery = (() => {
       queueIsEmpty(),
     ]));
 
-    const subscription = _whenReady(shouldFillHatchery, () => fillHatchery(hasFreeEggSlot));
+    const subscription = _whenReady(shouldFillHatchery, () => fillHatchery(hasFreeEggSlot, shouldSpreadPokerus()));
     return [subscription];
   }
 
+  function hasUninfectedEgg() {
+    return getPokerusEligiblePokemonsInHatchery({ includeHelperSlots: true })
+      .some((pokemon) => pokemon.pokerus === GameConstants.Pokerus.Uninfected);
+  }
+
   function automate() {
+    const shouldSpreadPokerus = ko.pureComputed(() => _and([
+      App.game.keyItems.hasKeyItem(KeyItemType.Pokerus_virus),
+      AutomationSettings.getValue(SETTINGS_SECTION, "spreadPokerus"),
+      App.game.party.caughtPokemon.some((pokemon) => _and([
+        pokemon.isHatchable(),
+        pokemon.pokerus === GameConstants.Pokerus.Uninfected,
+      ])) || hasUninfectedEgg(),
+    ]));
     _automate(() => _and([
       App.game.breeding.canAccess(),
       AutomationSettings.isEnabled(SETTINGS_SECTION),
     ]), [
+      () => breedPokemons(shouldSpreadPokerus),
+      () => manageHelpers(shouldSpreadPokerus),
       hatchEggs,
-      breedPokemons,
     ]);
   };
 

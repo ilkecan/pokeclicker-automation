@@ -36,8 +36,9 @@ const settingsDefinitions = [
       defaultValue: true,
       options: [
         { id: "fillEggSlots", label: "Fill empty egg slots", type: "boolean", defaultValue: true },
-        { id: "spreadPokerus", label: "Prioritize spreading Pokérus", type: "boolean", defaultValue: true },
         { id: "hatchReadyEggs", label: "Hatch ready eggs", type: "boolean", defaultValue: true },
+        { id: "manageHelpers", label: "Manage hatchery helpers", type: "boolean", defaultValue: true },
+        { id: "spreadPokerus", label: "Prioritize spreading Pokérus", type: "boolean", defaultValue: true },
       ],
     },
     {
