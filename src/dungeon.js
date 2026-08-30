@@ -480,5 +480,6 @@ const dungeon = (() => {
 
   return {
     automate,
+    chooseDungeonAction,
   }
 })();
