@@ -185,6 +185,12 @@ const hatchery = (() => {
         yield pokemon;
       }
     }
+
+    for (const pokemon of App.game.party.caughtPokemon) {
+      if (pokemon.isHatchable()) {
+        yield pokemon;
+      }
+    }
   }
 
   function fillHatchery(hasFreeEggSlot, spreadPokerus) {
