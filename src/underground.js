@@ -843,7 +843,18 @@ const underground = (() => {
 
   function sellUndergroundTreasures() {
     const treasures = UndergroundItems.list.filter((item) => item.valueType === UndergroundItemValueType.Diamond);
-    const treasuresToSell = treasures.filter((treasure) => ItemList[treasure.itemName].basePrice === Infinity); // exclude Everstone
+    const treasureNames = new Set(treasures.map((treasure) => treasure.itemName));
+    // ShardDeal can also store non-shard item costs as shards.
+    const tradeCostTreasureNames = new Set(
+      Object.values(ShardDeal.list)
+        .flatMap((deals) => deals().flatMap((deal) => deal.shards.map((shard) => shard.shardType.itemName)))
+        .filter((itemName) => treasureNames.has(itemName))
+    );
+    const treasuresToSell = treasures.filter((treasure) => !_or([
+      ItemList[treasure.itemName] instanceof HeldItem, // exclude Everstone
+      tradeCostTreasureNames.has(treasure.itemName), // exclude Odd Keystone
+    ]));
+
     return treasuresToSell.map((treasure) => {
       const canSell = ko.pureComputed(() => _and([
         AutomationSettings.getValue(SETTINGS_SECTION, "sellTreasures"),
