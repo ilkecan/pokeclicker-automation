@@ -20,6 +20,7 @@ const settingsDefinitions = [
       options: [
         { id: "catchWanderers", label: "Catch wanderers", type: "boolean", defaultValue: true },
         { id: "harvestWitheringBerries", label: "Harvest berries before they wither", type: "boolean", defaultValue: true },
+        { id: "useGooeyMulch", label: "Use Gooey Mulch for priority wanderers", type: "boolean", defaultValue: true },
       ],
     },
     {

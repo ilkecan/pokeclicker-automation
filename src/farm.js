@@ -3,13 +3,39 @@
 const farm = (() => {
   const SETTINGS_SECTION = "farm";
 
+  function catchWanderer(plot) {
+    const { wanderer } = plot;
+    const gooey = MulchType.Gooey_Mulch;
+
+    const priority = wanderer.shiny || !App.game.party.alreadyCaughtPokemonByName(wanderer.name);
+    const shouldMulch = _and([
+      AutomationSettings.getValue(SETTINGS_SECTION, "useGooeyMulch"),
+      priority,
+      plot.mulch === MulchType.None,
+      App.game.farming.hasMulch(gooey),
+    ])
+
+    if (shouldMulch) {
+      App.game.farming.addMulch(plot.index, gooey);
+      if (plot.mulch !== gooey) {
+        console.error("[pokeclicker-automation] farm: failed to apply Gooey Mulch before catching wanderer", {
+          plot: plot.index,
+          pokemon: wanderer.name,
+        });
+      }
+    }
+
+    App.game.farming.handleWanderer(plot);
+  }
+
   function catchWanderers() {
     const subscriptions = App.game.farming.plotList.map((plot) => {
       const shouldCatch = ko.pureComputed(() => _and([
         AutomationSettings.getValue(SETTINGS_SECTION, "catchWanderers"),
-        plot._wanderer(),
+        plot.canCatchWanderer(),
       ]));
-      return _whenReady(shouldCatch, () => App.game.farming.handleWanderer(plot));
+
+      return _whenReady(shouldCatch, () => catchWanderer(plot));
     });
     return subscriptions;
   }
