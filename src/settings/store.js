@@ -6,6 +6,7 @@ const AutomationSettings = (() => {
 
   const valueValidators = Object.freeze({
     boolean: (value) => typeof value === "boolean",
+    nonNegativeInteger: (value) => Number.isSafeInteger(value) && value >= 0,
   });
 
   function isRecord(value) {
