@@ -12,8 +12,9 @@ const {
   gitRevision,
   gitWorktreeDirty,
   installTypeScriptLoader,
+  resolveGameDir,
   sha256,
-} = require('../lib/runtime.cjs');
+} = require('../../lib/runtime.cjs');
 const { createVirtualClock } = require('../lib/virtual-clock.cjs');
 
 const REQUIRED_GAME_FILES = [
@@ -36,7 +37,7 @@ const TIMING_SOURCE_FILES = [
 const DEFAULT_MAX_DISCHARGE_FRAMES = 10000;
 
 function defaultGameDir() {
-  return path.resolve(__dirname, '..', '..', '..', '..', 'pokeclicker', 'pokeclicker');
+  return resolveGameDir(path.resolve(__dirname, '..', '..'));
 }
 
 function defaultAutomationPath() {

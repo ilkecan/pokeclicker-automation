@@ -1,5 +1,3 @@
 # Simulator libraries
 
-Shared Node.js support for simulator runtimes lives here. `runtime.cjs` provides TypeScript loading, deterministic randomness and source provenance; `virtual-clock.cjs` provides deterministic timer scheduling without real-time waits.
-
-Feature-specific behavior belongs in its simulator directory rather than this library.
+This directory contains simulator-specific support for deterministic event scheduling. `virtual-clock.cjs` provides a virtual clock without real-time waits.

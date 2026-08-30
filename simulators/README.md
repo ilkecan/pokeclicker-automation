@@ -2,7 +2,7 @@
 
 Simulators provide reproducible performance and behavior tests for automation policies. They execute TypeScript from an official PokéClicker checkout instead of maintaining copies of game rules.
 
-Each automation area has its own directory. Shared loaders, clocks and other area-independent support belong in [`lib/`](lib/).
+Each automation area has its own directory. Area-independent simulator-specific support lives in [`lib/`](lib/).
 
 ## Available simulators
 

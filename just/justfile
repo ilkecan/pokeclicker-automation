@@ -60,3 +60,11 @@ run:
   } {
     zellij --config {{zellij_config}} --layout {{zellij_layout}} attach --create-background $session
   }
+
+[script]
+test:
+  node --test "tests/**/*.test.cjs"
+
+[script]
+coverage:
+  node --experimental-test-coverage --test-coverage-include='src/**/*.js' --test-coverage-exclude='tests/**' --test-coverage-exclude='lib/**' --test-coverage-exclude='simulators/**' --test "tests/**/*.test.cjs"
