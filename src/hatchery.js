@@ -267,6 +267,7 @@ const hatchery = (() => {
     const queueIsEmpty = ko.pureComputed(() => App.game.breeding.queueList().length === 0);
     const hasFreeEggSlot = ko.pureComputed(() => App.game.breeding.hasFreeEggSlot());
     const shouldFillHatchery = ko.pureComputed(() => _and([
+      App.game.party.caughtPokemon.some((pokemon) => pokemon.isHatchable()),
       AutomationSettings.getValue(SETTINGS_SECTION, "fillEggSlots"),
       hasFreeEggSlot(),
       queueIsEmpty(),
