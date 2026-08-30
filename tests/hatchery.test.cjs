@@ -433,3 +433,71 @@ test("uses all hatchable pokemons for Pokerus even when filtered fallback exclud
 
   assert.deepEqual(collectCandidateIds(hatchery, 2), [1, 2]);
 });
+
+test("falls back to all hatchable Pokemon when filtered candidates are empty", (t) => {
+  const first = createPokemon(1, PokemonType.Fire);
+  const second = createPokemon(2, PokemonType.Water);
+  const hatchery = loadHatchery(t, {
+    caughtPokemon: [first, second],
+    filteredCandidates: [],
+    eggs: [createEgg(null, { none: true })],
+    eggSlots: 1,
+    spreadPokerus: false,
+  });
+
+  assert.deepEqual(collectCandidateIds(hatchery, 2, false), [1, 2]);
+});
+
+test("keeps Pokerus, filtered, then fallback candidate order", (t) => {
+  const spreader = createPokemon(1, PokemonType.Fire, PokemonType.None, Pokerus.Contagious);
+  const filtered = createPokemon(2, PokemonType.Water);
+  const fallback = createPokemon(3, PokemonType.Grass);
+  const hatchery = loadHatchery(t, {
+    caughtPokemon: [spreader, filtered, fallback],
+    filteredCandidates: [filtered],
+    eggs: [createEgg(null, { none: true }), createEgg(null, { none: true })],
+    eggSlots: 2,
+    spreadPokerus: false,
+  });
+
+  assert.deepEqual(collectCandidateIds(hatchery, 3, false), [2, 1, 3]);
+});
+
+test("successful fallback additions exclude the same Pokemon later", (t) => {
+  const first = createPokemon(1, PokemonType.Fire);
+  const second = createPokemon(2, PokemonType.Water);
+  const hatchery = loadHatchery(t, {
+    caughtPokemon: [first, second],
+    filteredCandidates: [first],
+    eggs: [createEgg(null, { none: true }), createEgg(null, { none: true })],
+    eggSlots: 2,
+    spreadPokerus: false,
+  });
+
+  assert.deepEqual(collectCandidateIds(hatchery, 3, false), [1, 2]);
+});
+
+test("readiness follows hatchable inventory as slots fill", (t) => {
+  const first = createPokemon(1, PokemonType.Fire);
+  const later = createPokemon(2, PokemonType.Water, PokemonType.None, Pokerus.Uninfected, true);
+  const laterHatchable = ko.observable(false);
+  later.isHatchable = () => laterHatchable();
+  const loaded = loadHatchery(t, {
+    caughtPokemon: [first, later],
+    filteredCandidates: [],
+    eggs: [createEgg(null, { none: true }), createEgg(null, { none: true })],
+    eggSlots: 2,
+    spreadPokerus: false,
+    returnContext: true,
+  });
+
+  loaded.hatchery.automate();
+  assert.deepEqual(loaded.addedPokemon.map((pokemon) => pokemon.id), [1]);
+  later.breeding = false;
+  laterHatchable(true);
+  loaded.context.App.game.breeding.queueList([{}]);
+  ko.tasks.runEarly();
+  loaded.context.App.game.breeding.queueList([]);
+  ko.tasks.runEarly();
+  assert.deepEqual(loaded.addedPokemon.map((pokemon) => pokemon.id), [1, 2]);
+});
