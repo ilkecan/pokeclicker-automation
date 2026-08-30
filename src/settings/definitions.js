@@ -64,7 +64,9 @@ const settingsDefinitions = [
       label: "Shop",
       defaultValue: true,
       options: [
-        { id: "buyPokeBalls", label: "Buy Poke Balls for achievements", type: "boolean", defaultValue: true },
+        { id: "targetPokeball", label: "Poke Ball target", type: "nonNegativeInteger", defaultValue: 0 },
+        { id: "targetGreatball", label: "Great Ball target", type: "nonNegativeInteger", defaultValue: 0 },
+        { id: "targetUltraball", label: "Ultra Ball target", type: "nonNegativeInteger", defaultValue: 0 },
       ],
     },
     {

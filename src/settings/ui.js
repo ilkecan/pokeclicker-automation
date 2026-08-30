@@ -1,5 +1,13 @@
 "use strict";
 
+function normalizeNonNegativeInteger(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) {
+    return 0;
+  }
+  return Math.min(Math.trunc(number), Number.MAX_SAFE_INTEGER);
+}
+
 function installAutomationSettingsTab() {
   const tabId = "settings-automation";
 
@@ -55,6 +63,10 @@ function installAutomationSettingsTab() {
                   <div class="toggler-knob"></div>
                 </div>
               </label>
+              <!-- /ko -->
+              <!-- ko if: type === "nonNegativeInteger" -->
+              <input class="form-control" type="number" min="0" max="${Number.MAX_SAFE_INTEGER}" step="1"
+                data-bind="value: value, enable: $parent.enabled, event: { change: function(_, event) { var normalized = normalizeNonNegativeInteger(event.target.value); event.target.value = normalized; value(normalized); } }, attr: { id: 'automation-' + $parent.id + '-' + id, 'aria-label': label }">
               <!-- /ko -->
             </td>
           </tr>

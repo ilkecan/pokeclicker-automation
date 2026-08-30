@@ -2,68 +2,60 @@
 
 const shop = (() => {
   const SETTINGS_SECTION = "shop";
+  const ITEM_NAMES = ["Pokeball", "Greatball", "Ultraball"];
 
   function synchronizeItemPrice(item) {
     const multiplier = player.itemMultipliers[item.saveName] || 1;
     item.price(Math.round(item.basePrice * multiplier));
   }
 
-  function buyPokeBall(pokeball, targetAmountPerBall, buyingEnabled) {
-    const numBallNeeded = ko.pureComputed(() => targetAmountPerBall[pokeball.name] - App.game.statistics.pokeballsObtained[GameConstants.Pokeball[pokeball.name]]());
-    if (numBallNeeded() <= 0) {
-      return [];
-    }
-
-    synchronizeItemPrice(pokeball);
-    const shouldBuy = ko.pureComputed(() => pokeball.price() == pokeball.basePrice);
-    const canBuy = ko.pureComputed(() => App.game.wallet.currencies[pokeball.currency]() >= pokeball.basePrice);
+  function buyItem(item, targetAmount) {
+    const numNeeded = ko.pureComputed(() => targetAmount() - item.getBagAmount());
+    synchronizeItemPrice(item);
+    const shouldBuy = ko.pureComputed(() => item.price() == item.basePrice);
+    const canBuy = ko.pureComputed(() => App.game.wallet.currencies[item.currency]() >= item.basePrice);
     const ready = ko.pureComputed(() => _and([
-      buyingEnabled(),
-      numBallNeeded() > 0,
+      numNeeded() > 0,
       shouldBuy(),
       canBuy(),
     ]));
 
     const subscription = _whenReady(ready, () => {
-      const currency = App.game.wallet.currencies[pokeball.currency];
-      let remaining = numBallNeeded();
+      const currency = App.game.wallet.currencies[item.currency];
+      let remaining = numNeeded();
 
-      if (pokeball.multiplier === 1) {
-        const affordable = Math.floor(currency() / pokeball.basePrice);
-        pokeball.buy(Math.min(affordable, remaining));
+      if (item.multiplier === 1) {
+        const affordable = Math.floor(currency() / item.basePrice);
+        item.buy(Math.min(affordable, remaining));
         return;
       }
 
-      while (remaining > 0 && pokeball.price() === pokeball.basePrice && currency() >= pokeball.basePrice) {
-        pokeball.buy(1);
+      while (remaining > 0 && item.price() === item.basePrice && currency() >= item.basePrice) {
+        item.buy(1);
         remaining--;
       }
     });
     return [subscription];
   }
 
-  function buyPokeBalls() {
-    const buyingEnabled = AutomationSettings.value(SETTINGS_SECTION, "buyPokeBalls");
-    const achievements = AchievementHandler.achievementList.filter((achievement) => achievement.property.achievementType === GameConstants.AchievementType["Poke Balls"]);
-    const achievementsPerBall = Object.groupBy(achievements, (achievement) => GameConstants.Pokeball[achievement.property.pokeball]);
-    const targetAmountPerBall = Object.fromEntries(
-      Object.entries(achievementsPerBall).map(([ballType, achievements]) => [
-        ballType,
-        Math.max(...achievements.map((achievement) => achievement.property.requiredValue))
-      ])
+  function buyItems() {
+    const targetByName = new Map(
+      ITEM_NAMES.map((itemName) => [
+        itemName,
+        AutomationSettings.value(SETTINGS_SECTION, `target${itemName}`),
+      ]),
     );
-
-    const pokeballs = pokeMartShop.items
-      .filter((item) => item instanceof PokeballItem)
+    const items = pokeMartShop.items
+      .filter((item) => targetByName.has(item.name))
       .sort((a, b) => b.basePrice - a.basePrice);
-    return pokeballs.flatMap((pokeball) => buyPokeBall(pokeball, targetAmountPerBall, buyingEnabled));
+    return items.flatMap((item) => buyItem(item, targetByName.get(item.name)));
   }
 
   function automate() {
     _automate(() => _and([
       ShopHandler.shortcutVisible(),
       AutomationSettings.isEnabled(SETTINGS_SECTION),
-    ]), [buyPokeBalls]);
+    ]), [buyItems]);
   };
 
   return {
