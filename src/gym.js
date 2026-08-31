@@ -27,6 +27,8 @@ const gym = (() => {
           return;
         }
 
+        GymRunner.autoRestart(false);
+
         patchStartGym(originalStartGym);
         originalStartGym = null;
       }
