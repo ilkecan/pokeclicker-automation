@@ -15,7 +15,7 @@ function installAutomationSettingsTab() {
   const tabs = settingsModal?.querySelector(".modal-body > .nav-tabs");
   const tabContent = settingsModal?.querySelector(".modal-body > .tab-content");
   if (!tabs || !tabContent) {
-    console.warn("[pokeclicker-automation] could not find the settings modal tab containers");
+    console.warn("[pokeclicker-automation] settings: could not find the settings modal tab containers");
     return;
   }
 

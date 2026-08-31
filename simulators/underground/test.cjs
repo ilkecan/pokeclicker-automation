@@ -188,8 +188,8 @@ expectCliRejection(['--max-ticks', '-1'], /--max-ticks expects a positive intege
 testSuccessfulComparison();
 
 Promise.all([testVirtualClock(), testRuntimeLifecycle()]).then(() => {
-  console.log('simulator tests passed');
+  console.log('[pokeclicker-automation] tests: simulator tests passed');
 }).catch((error) => {
-  console.error(error.stack || error);
+  console.error('[pokeclicker-automation] tests: simulator tests failed', error.stack || error);
   process.exitCode = 1;
 });

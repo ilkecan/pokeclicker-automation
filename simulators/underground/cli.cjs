@@ -35,13 +35,13 @@ uses that checkout's own TypeScript and Knockout packages.`;
 
 function parseInteger(name, value) {
   const parsed = Number(value);
-  if (!Number.isInteger(parsed)) throw new Error(`${name} expects an integer, got ${value}`);
+  if (!Number.isInteger(parsed)) throw new Error(`[pokeclicker-automation] underground-cli: ${name} expects an integer, got ${value}`);
   return parsed;
 }
 
 function parsePositiveInteger(name, value) {
   const parsed = parseInteger(name, value);
-  if (parsed < 1) throw new Error(`${name} expects a positive integer, got ${value}`);
+  if (parsed < 1) throw new Error(`[pokeclicker-automation] underground-cli: ${name} expects a positive integer, got ${value}`);
   return parsed;
 }
 
@@ -62,7 +62,7 @@ function parseArgs(argv) {
     const argument = argv[index];
     const next = () => {
       index += 1;
-      if (index >= argv.length) throw new Error(`${argument} expects a value`);
+      if (index >= argv.length) throw new Error(`[pokeclicker-automation] underground-cli: ${argument} expects a value`);
       return argv[index];
     };
     switch (argument) {
@@ -80,7 +80,7 @@ function parseArgs(argv) {
       case '--json': options.json = true; break;
       case '--per-mine': options.perMine = true; break;
       case '--help': options.help = true; break;
-      default: throw new Error(`unknown option: ${argument}`);
+      default: throw new Error(`[pokeclicker-automation] underground-cli: unknown option: ${argument}`);
     }
   }
   return options;
@@ -94,24 +94,24 @@ function formatCounter(counter, names) {
 function printReport(report, perMine) {
   const { configuration, totals, averages, performance, officialSource, automationSource } = report;
   const toolNames = { 0: 'chisel', 1: 'hammer', 2: 'bomb', 3: 'survey' };
-  console.log(`Simulated ${configuration.mines} ${configuration.mineType} mine(s) at level ${configuration.level}`);
+  console.log(`[pokeclicker-automation] underground-cli: Simulated ${configuration.mines} ${configuration.mineType} mine(s) at level ${configuration.level}`);
   const dirtyMarker = officialSource.dirty === true ? ' (dirty worktree)' : '';
-  console.log(`Official game: ${officialSource.revision || 'unknown revision'}${dirtyMarker} at ${officialSource.gameDir}`);
-  console.log(`Automation: ${automationSource.path}`);
-  console.log(`Completed: ${totals.itemsFound}/${totals.itemsBuried} items in ${totals.ticks} ticks`);
-  console.log(`Virtual time: ${totals.simulatedSeconds.toFixed(3)} seconds (${totals.discoverySeconds.toFixed(3)} discovering mines)`);
-  console.log(`Average: ${averages.ticksPerMine.toFixed(3)} ticks/mine, ${averages.layersRemovedPerMine.toFixed(3)} layers/mine`);
-  console.log(`Rewards: gained=${totals.itemsGained}, destroyed=${totals.itemsDestroyed}`);
-  console.log(`Tools: ${formatCounter(totals.toolsUsed, toolNames)}`);
-  console.log(`Battery: ${formatCounter(totals.batteryDischarges)}`);
-  console.log(`Policy setup: ${performance.automationSetupElapsedMs.toFixed(2)} ms, ${performance.automationSetupMicrosecondsPerMine.toFixed(2)} microseconds/mine`);
-  console.log(`Policy actions: ${performance.automationActionElapsedMs.toFixed(2)} ms, ${performance.automationActionMicrosecondsPerTick.toFixed(2)} microseconds/tick`);
-  console.log(`Policy total: ${performance.automationElapsedMs.toFixed(2)} ms`);
-  console.log(`Total runtime: ${performance.elapsedMs.toFixed(2)} ms, ${performance.minesPerSecond.toFixed(2)} mines/s`);
-  console.log(`Official TypeScript modules loaded: ${officialSource.modulesLoaded.length}`);
+  console.log(`[pokeclicker-automation] underground-cli: Official game: ${officialSource.revision || 'unknown revision'}${dirtyMarker} at ${officialSource.gameDir}`);
+  console.log(`[pokeclicker-automation] underground-cli: Automation: ${automationSource.path}`);
+  console.log(`[pokeclicker-automation] underground-cli: Completed: ${totals.itemsFound}/${totals.itemsBuried} items in ${totals.ticks} ticks`);
+  console.log(`[pokeclicker-automation] underground-cli: Virtual time: ${totals.simulatedSeconds.toFixed(3)} seconds (${totals.discoverySeconds.toFixed(3)} discovering mines)`);
+  console.log(`[pokeclicker-automation] underground-cli: Average: ${averages.ticksPerMine.toFixed(3)} ticks/mine, ${averages.layersRemovedPerMine.toFixed(3)} layers/mine`);
+  console.log(`[pokeclicker-automation] underground-cli: Rewards: gained=${totals.itemsGained}, destroyed=${totals.itemsDestroyed}`);
+  console.log(`[pokeclicker-automation] underground-cli: Tools: ${formatCounter(totals.toolsUsed, toolNames)}`);
+  console.log(`[pokeclicker-automation] underground-cli: Battery: ${formatCounter(totals.batteryDischarges)}`);
+  console.log(`[pokeclicker-automation] underground-cli: Policy setup: ${performance.automationSetupElapsedMs.toFixed(2)} ms, ${performance.automationSetupMicrosecondsPerMine.toFixed(2)} microseconds/mine`);
+  console.log(`[pokeclicker-automation] underground-cli: Policy actions: ${performance.automationActionElapsedMs.toFixed(2)} ms, ${performance.automationActionMicrosecondsPerTick.toFixed(2)} microseconds/tick`);
+  console.log(`[pokeclicker-automation] underground-cli: Policy total: ${performance.automationElapsedMs.toFixed(2)} ms`);
+  console.log(`[pokeclicker-automation] underground-cli: Total runtime: ${performance.elapsedMs.toFixed(2)} ms, ${performance.minesPerSecond.toFixed(2)} mines/s`);
+  console.log(`[pokeclicker-automation] underground-cli: Official TypeScript modules loaded: ${officialSource.modulesLoaded.length}`);
   if (perMine) {
     report.mines.forEach((mine, index) => {
-      console.log(`#${index + 1} ${mine.mineType}: ticks=${mine.ticks}, items=${mine.itemsFound}, layers=${mine.layersRemoved}, tools=[${formatCounter(mine.toolsUsed, toolNames)}]`);
+      console.log(`[pokeclicker-automation] underground-cli: #${index + 1} ${mine.mineType}: ticks=${mine.ticks}, items=${mine.itemsFound}, layers=${mine.layersRemoved}, tools=[${formatCounter(mine.toolsUsed, toolNames)}]`);
     });
   }
 }
@@ -119,7 +119,7 @@ function printReport(report, perMine) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) {
-    console.log(usage());
+    console.log(`[pokeclicker-automation] underground-cli: ${usage()}`);
     return;
   }
   const runtime = createRuntime(options);
@@ -142,6 +142,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`simulator: ${error.stack || error.message}`);
+  console.error(`[pokeclicker-automation] underground-cli: ${error.stack || error.message}`);
   process.exitCode = 1;
 });

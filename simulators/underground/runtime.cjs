@@ -95,11 +95,11 @@ function createRuntime(options = {}) {
   const region = Number(options.region ?? 7);
   const maxDischargeFrames = Number(options.maxDischargeFrames ?? DEFAULT_MAX_DISCHARGE_FRAMES);
 
-  if (!Number.isSafeInteger(seed) || seed < 0) throw new Error(`seed must be a non-negative safe integer, got ${seed}`);
-  if (!Number.isInteger(level) || level < 0) throw new Error(`level must be a non-negative integer, got ${level}`);
-  if (!Number.isInteger(region) || region < 0 || region > 9) throw new Error(`region must be an integer from 0 to 9, got ${region}`);
+  if (!Number.isSafeInteger(seed) || seed < 0) throw new Error(`[pokeclicker-automation] underground-runtime: seed must be a non-negative safe integer, got ${seed}`);
+  if (!Number.isInteger(level) || level < 0) throw new Error(`[pokeclicker-automation] underground-runtime: level must be a non-negative integer, got ${level}`);
+  if (!Number.isInteger(region) || region < 0 || region > 9) throw new Error(`[pokeclicker-automation] underground-runtime: region must be an integer from 0 to 9, got ${region}`);
   if (!Number.isInteger(maxDischargeFrames) || maxDischargeFrames < 1) {
-    throw new Error(`maxDischargeFrames must be a positive integer, got ${maxDischargeFrames}`);
+    throw new Error(`[pokeclicker-automation] underground-runtime: maxDischargeFrames must be a positive integer, got ${maxDischargeFrames}`);
   }
 
   for (const relative of [...REQUIRED_GAME_FILES, ...TIMING_SOURCE_FILES]) {
@@ -306,7 +306,7 @@ function createRuntime(options = {}) {
     };
     const automationModule = evaluateScope(automationPath, ['underground']).underground;
     if (typeof automationModule?.dig !== 'function') {
-      throw new Error('Automation source does not export underground.dig');
+      throw new Error('[pokeclicker-automation] underground-runtime: Automation source does not export underground.dig');
     }
 
     const gameTickMilliseconds = GameConstants.TICK_TIME;
@@ -413,7 +413,7 @@ function createRuntime(options = {}) {
         .find((key) => key.toLowerCase() === normalized);
       if (!match) {
         const names = Object.keys(MineType).filter((key) => Number.isNaN(Number(key)));
-        throw new Error(`unknown mine type ${name}; expected one of ${names.join(', ')}`);
+        throw new Error(`[pokeclicker-automation] underground-runtime: unknown mine type ${name}; expected one of ${names.join(', ')}`);
       }
       return MineType[match];
     }
@@ -466,15 +466,15 @@ function createRuntime(options = {}) {
         const ticks = automationTicks - automationTicksBefore;
         const dischargeActive = Boolean(battery._activeDischargePattern);
         if (!mine.completed && !dischargeActive && ticks >= maxTicks) {
-          throw new Error(`mine did not complete within ${maxTicks} automation ticks`);
+          throw new Error(`[pokeclicker-automation] underground-runtime: mine did not complete within ${maxTicks} automation ticks`);
         }
         if (dischargeActive) {
           if (!clock.hasPendingTimers) {
-            throw new Error('battery discharge is active without a pending timer');
+            throw new Error('[pokeclicker-automation] underground-runtime: battery discharge is active without a pending timer');
           }
           const dischargeFrame = battery.toJSON().activeDischargeFrame;
           if (dischargeFrame > maxDischargeFrames) {
-            throw new Error(`battery discharge exceeded ${maxDischargeFrames} frames`);
+            throw new Error(`[pokeclicker-automation] underground-runtime: battery discharge exceeded ${maxDischargeFrames} frames`);
           }
         }
         const pendingMicrotasks = advanceVirtualTime();
@@ -510,12 +510,12 @@ function createRuntime(options = {}) {
     let hasRun = false;
     return {
       async run({ mines = 100, mineType = 'Random', maxTicks = 100000 } = {}) {
-        if (restored) throw new Error('runtime has been restored and cannot be run');
-        if (hasRun) throw new Error('runtime can only be run once');
-        if (!Number.isInteger(mines) || mines < 1) throw new Error(`mines must be a positive integer, got ${mines}`);
-        if (!Number.isInteger(maxTicks) || maxTicks < 1) throw new Error(`maxTicks must be a positive integer, got ${maxTicks}`);
+        if (restored) throw new Error('[pokeclicker-automation] underground-runtime: runtime has been restored and cannot be run');
+        if (hasRun) throw new Error('[pokeclicker-automation] underground-runtime: runtime can only be run once');
+        if (!Number.isInteger(mines) || mines < 1) throw new Error(`[pokeclicker-automation] underground-runtime: mines must be a positive integer, got ${mines}`);
+        if (!Number.isInteger(maxTicks) || maxTicks < 1) throw new Error(`[pokeclicker-automation] underground-runtime: maxTicks must be a positive integer, got ${maxTicks}`);
         if (options.pairedBoards !== false && seed + mines * 2 > Number.MAX_SAFE_INTEGER) {
-          throw new Error('seed and mine count exceed the safe integer range for paired streams');
+          throw new Error('[pokeclicker-automation] underground-runtime: seed and mine count exceed the safe integer range for paired streams');
         }
         hasRun = true;
         const started = process.hrtime.bigint();
