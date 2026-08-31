@@ -68,6 +68,9 @@ function installAutomationSettingsTab() {
               <input class="form-control" type="number" min="0" max="${Number.MAX_SAFE_INTEGER}" step="1"
                 data-bind="value: value, enable: $parent.enabled, event: { change: function(_, event) { var normalized = normalizeNonNegativeInteger(event.target.value); event.target.value = normalized; value(normalized); } }, attr: { id: 'automation-' + $parent.id + '-' + id, 'aria-label': label }">
               <!-- /ko -->
+              <!-- ko if: type === "enum" -->
+              <select class="form-control" data-bind="value: value, options: values, optionsText: function(value) { return value.charAt(0).toUpperCase() + value.slice(1); }, enable: $parent.enabled, attr: { id: 'automation-' + $parent.id + '-' + id, 'aria-label': label }"></select>
+              <!-- /ko -->
             </td>
           </tr>
         </tbody>
