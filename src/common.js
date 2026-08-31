@@ -25,15 +25,19 @@ function _disposeAll(subscriptions) {
   subscriptions.length = 0;
 }
 
+function _or(xs) {
+  return xs.some(Boolean);
+}
+
+function _runAndSubscribe(observable, action) {
+  action(observable());
+  return observable.subscribe(action);
+}
+
 function _whenReady(computed, action) {
   return _runAndSubscribe(computed, (ready) => {
     if (ready) {
       action();
     }
   });
-}
-
-function _runAndSubscribe(observable, action) {
-  action(observable());
-  return observable.subscribe(action);
 }
