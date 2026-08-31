@@ -885,6 +885,7 @@ const underground = (() => {
 
   return {
     automate,
-    dig, // for simulation
+    dig,
+    sellUndergroundTreasures,
   }
 })();
