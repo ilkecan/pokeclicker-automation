@@ -6,6 +6,7 @@ const AutomationSettings = (() => {
 
   const valueValidators = Object.freeze({
     boolean: (value) => typeof value === "boolean",
+    enum: (value, values) => Array.isArray(values) && values.includes(value),
     nonNegativeInteger: (value) => Number.isSafeInteger(value) && value >= 0,
   });
 
@@ -13,12 +14,12 @@ const AutomationSettings = (() => {
     return value !== null && typeof value === "object" && !Array.isArray(value);
   }
 
-  function validateValue(value, type, path) {
+  function validateValue(value, type, path, values) {
     const validator = valueValidators[type];
     if (!validator) {
       throw new Error(`Unknown value type \`${type}\` for \`${path}\``);
     }
-    if (!validator(value)) {
+    if (!validator(value, values)) {
       throw new Error(`Invalid ${type} value for \`${path}\``);
     }
   }
@@ -27,7 +28,7 @@ const AutomationSettings = (() => {
     validateValue(definition.defaultValue, "boolean", `${definition.id}.defaultValue`);
 
     const options = definition.options.map((option) => {
-      validateValue(option.defaultValue, option.type, `${definition.id}.${option.id}.defaultValue`);
+      validateValue(option.defaultValue, option.type, `${definition.id}.${option.id}.defaultValue`, option.values);
       return {
         ...option,
         value: ko.observable(option.defaultValue),
@@ -156,7 +157,7 @@ const AutomationSettings = (() => {
 
       for (const option of section.options) {
         if (Object.hasOwn(storedSection, option.id)) {
-          validateValue(storedSection[option.id], option.type, `${sectionId}.${option.id}`);
+          validateValue(storedSection[option.id], option.type, `${sectionId}.${option.id}`, option.values);
         }
       }
     }

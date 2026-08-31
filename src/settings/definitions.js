@@ -1,12 +1,15 @@
 "use strict";
 
-const settingsDefinitions = [
+const settingsDefinitions = (() => {
+  const chestTiers = Object.keys(dungeon.ChestTier);
+  return [
     {
       id: "dungeon",
       label: "Dungeon",
       defaultValue: true,
       options: [
         { id: "fightAllBattles", label: "Fight all battles", type: "boolean", defaultValue: true },
+        { id: "minimumChestTier", label: "Minimum chest tier to open", type: "enum", values: chestTiers, defaultValue: chestTiers[0] },
         { id: "openAccessibleChests", label: "Open accessible chests before progressing", type: "boolean", defaultValue: true },
         { id: "restartUponLoss", label: "Restart the dungeon upon lost", type: "boolean", defaultValue: true },
         { id: "restartUponWin", label: "Restart the dungeon upon win", type: "boolean", defaultValue: true },
@@ -79,4 +82,5 @@ const settingsDefinitions = [
         { id: "sellTreasures", label: "Sell treasures with no item value", type: "boolean", defaultValue: true },
       ],
     },
-];
+  ];
+})();

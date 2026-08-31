@@ -8,13 +8,41 @@ const constantsHarness = createHarness();
 const { GameConstants } = constantsHarness.game;
 const { DungeonTileType } = GameConstants;
 
-function loadDungeon(t) {
-  return createHarness(t).loadAutomation("dungeon").automation;
+const testLootTierWeights = Object.freeze({
+  common: 0.75,
+  rare: 0.2,
+  epic: 0.04,
+  legendary: 0.0099,
+  mythic: 0.0001,
+});
+const testPartialLootTierWeights = Object.freeze({
+  common: 0.75,
+  epic: 0.04,
+  mythic: 0.0001,
+});
+
+function createDungeonGlobals() {
+  return {
+    dungeonList: {
+      firstDungeon: {
+        getLootTierWeights: () => testPartialLootTierWeights,
+      },
+      secondDungeon: {
+        getLootTierWeights: () => testLootTierWeights,
+      },
+    },
+  };
 }
+
+function loadDungeon(t) {
+  return createHarness(t).loadAutomation("dungeon", createDungeonGlobals()).automation;
+}
+
 
 function createState({
   targetType,
   targetPosition = [4, 4],
+  targetChestTier = null,
   options = {},
   targetCounts = { chests: 0, battles: 0 },
   visited = [[0, 0], [1, 0], [2, 0]],
@@ -56,6 +84,9 @@ function createState({
   const target = board[targetY][targetX];
   target.isVisible = true;
   target.type = normalizedTargetType;
+  if (normalizedTargetType === DungeonTileType.chest) {
+    target.chestTier = targetChestTier;
+  }
   if (normalizedTargetType === DungeonTileType.boss) {
     progression = target;
   }
@@ -65,6 +96,7 @@ function createState({
     options: {
       searchAllChests: false,
       openAccessibleChests: true,
+      minimumChestTier: "common",
       fightAllBattles: false,
       ...options,
     },
@@ -88,6 +120,18 @@ function assertMove(action, coordinates) {
 let dungeon;
 test.beforeEach((t) => {
   dungeon = loadDungeon(t);
+});
+
+test("uses the largest available chest tier set", () => {
+  assert.deepEqual(Object.keys(dungeon.ChestTier), Object.keys(testLootTierWeights));
+  assert.deepEqual(Object.values(dungeon.ChestTier), [0, 1, 2, 3, 4]);
+});
+
+test("fails when no dungeon loot tiers exist", (t) => {
+  assert.throws(
+    () => createHarness(t).loadAutomation("dungeon", { dungeonList: {} }),
+    /Could not derive chest tiers from dungeonList/,
+  );
 });
 
 test("moves toward an inaccessible progression tile from the closest visited tile", (t) => {
@@ -153,11 +197,70 @@ test("progresses before opening accessible chests when disabled", (t) => {
   const state = createState({
     targetType: "chest",
     targetPosition: [1, 0],
-    options: { openAccessibleChests: false },
+    options: { openAccessibleChests: false, minimumChestTier: "rare" },
     progressionPosition: [4, 0],
   });
 
   assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 0 });
+});
+
+test("opens accessible common chests by default", (t) => {
+  const state = createState({
+    targetType: "chest",
+    targetPosition: [1, 0],
+    targetChestTier: "common",
+    progressionPosition: [4, 0],
+  });
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+});
+
+test("skips accessible common chests", (t) => {
+  const state = createState({
+    targetType: "chest",
+    targetPosition: [1, 0],
+    targetChestTier: "common",
+    options: { minimumChestTier: "rare" },
+    progressionPosition: [4, 0],
+  });
+  const rareChest = state.board[0][0][2];
+  rareChest.isVisible = true;
+  rareChest.type = DungeonTileType.chest;
+  rareChest.chestTier = "rare";
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 2, y: 0 });
+});
+
+test("progresses when only accessible chests are common", (t) => {
+  const state = createState({
+    targetType: "chest",
+    targetPosition: [1, 0],
+    targetChestTier: "common",
+    options: { minimumChestTier: "rare" },
+    progressionPosition: [4, 0],
+  });
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 0 });
+});
+
+test("opens the first accessible chest at or above the minimum tier", (t) => {
+  const state = createState({
+    targetType: "chest",
+    targetPosition: [1, 0],
+    targetChestTier: "common",
+    options: { minimumChestTier: "epic" },
+    progressionPosition: [4, 0],
+  });
+  const rareChest = state.board[0][0][2];
+  rareChest.isVisible = true;
+  rareChest.type = DungeonTileType.chest;
+  rareChest.chestTier = "rare";
+  const epicChest = state.board[0][0][3];
+  epicChest.isVisible = true;
+  epicChest.type = DungeonTileType.chest;
+  epicChest.chestTier = "epic";
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 3, y: 0 });
 });
 
 test("prioritizes inaccessible progression over secondary targets", (t) => {

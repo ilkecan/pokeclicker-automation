@@ -5,9 +5,6 @@
 // @match       pokeclicker://game/index.html
 // @match       file:///home/*/.config/pokeclicker-desktop/pokeclicker-master/docs/index.html
 // @require     common.js
-// @require     settings/definitions.js
-// @require     settings/store.js
-// @require     settings/ui.js
 // @require     dungeon.js
 // @require     farm.js
 // @require     gym.js
@@ -16,6 +13,9 @@
 // @require     quests.js
 // @require     shop.js
 // @require     underground.js
+// @require     settings/definitions.js
+// @require     settings/store.js
+// @require     settings/ui.js
 // @grant       none
 // @icon        https://raw.githubusercontent.com/pokeclicker/pokeclicker/develop/src/assets/images/favicon.ico
 // @version     0.10.25

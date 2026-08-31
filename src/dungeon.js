@@ -3,6 +3,28 @@
 const dungeon = (() => {
   const SETTINGS_SECTION = "dungeon";
 
+  function createChestTier() {
+    let selected = { tierCount: 0 };
+    for (const candidate of Object.values(dungeonList)) {
+      const weights = candidate.getLootTierWeights(1, false);
+      const tierCount = Object.keys(weights).length;
+      if (tierCount > selected.tierCount) {
+        selected = { weights, tierCount };
+      }
+    }
+
+    if (selected.tierCount === 0) {
+      throw new Error("Could not derive chest tiers from dungeonList");
+    }
+
+    return Object.freeze(Object.fromEntries(
+      Object.entries(selected.weights)
+        .sort(([, chanceA], [, chanceB]) => chanceB - chanceA)
+        .map(([tier], rank) => [tier, rank])
+    ));
+  }
+
+  const ChestTier = createChestTier();
   const DIRECTIONS = [
     { x: 0, y: -1 },
     { x: 1, y: 0 },
@@ -78,6 +100,7 @@ const dungeon = (() => {
   function updateDungeonState(state, map) {
     state.options.fightAllBattles = AutomationSettings.getValue(SETTINGS_SECTION, "fightAllBattles");
     state.options.openAccessibleChests = AutomationSettings.getValue(SETTINGS_SECTION, "openAccessibleChests");
+    state.options.minimumChestTier = AutomationSettings.getValue(SETTINGS_SECTION, "minimumChestTier");
     state.options.searchAllChests = AutomationSettings.getValue(SETTINGS_SECTION, "searchAllChests");
 
     const point = map.playerPosition();
@@ -360,7 +383,11 @@ const dungeon = (() => {
     }
 
     if (options.openAccessibleChests) {
-      const chest = findTileByType(state, GameConstants.DungeonTileType.chest, { accessible: true });
+      const chest = findTile(state, (tile) => _and([
+        ChestTier[tile.chestTier] >= ChestTier[options.minimumChestTier],
+        isAccessible(state, tile),
+        tile.type === GameConstants.DungeonTileType.chest,
+      ]));
       if (chest) {
         return samePosition(position, chest) ? interactAction(Interaction.CHEST) : moveAction(chest);
       }
@@ -479,6 +506,7 @@ const dungeon = (() => {
   };
 
   return {
+    ChestTier,
     automate,
     chooseDungeonAction,
   }
