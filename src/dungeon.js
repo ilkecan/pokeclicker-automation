@@ -3,28 +3,13 @@
 const dungeon = (() => {
   const SETTINGS_SECTION = "dungeon";
 
-  function createChestTier() {
-    let selected = { tierCount: 0 };
-    for (const candidate of Object.values(dungeonList)) {
-      const weights = candidate.getLootTierWeights(1, false);
-      const tierCount = Object.keys(weights).length;
-      if (tierCount > selected.tierCount) {
-        selected = { weights, tierCount };
-      }
-    }
-
-    if (selected.tierCount === 0) {
-      throw new Error("[pokeclicker-automation] dungeon: could not derive chest tiers from dungeonList");
-    }
-
-    return Object.freeze(Object.fromEntries(
-      Object.entries(selected.weights)
-        .sort(([, chanceA], [, chanceB]) => chanceB - chanceA)
-        .map(([tier], rank) => [tier, rank])
-    ));
-  }
-
-  const ChestTier = createChestTier();
+  const ChestTier = Object.freeze({
+    common: 0,
+    rare: 1,
+    epic: 2,
+    legendary: 3,
+    mythic: 4,
+  });
   const DIRECTIONS = [
     { x: 0, y: -1 },
     { x: 1, y: 0 },

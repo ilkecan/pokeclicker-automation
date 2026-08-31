@@ -13,13 +13,7 @@ const testLootTierWeights = Object.freeze({
 });
 
 function createDungeonGlobals() {
-  return {
-    dungeonList: {
-      firstDungeon: {
-        getLootTierWeights: () => testLootTierWeights,
-      },
-    },
-  };
+  return {};
 }
 
 function loadSettings(t, stored = null) {
@@ -45,7 +39,7 @@ function loadSettings(t, stored = null) {
   return { settings: loaded.value, storage, runtime: loaded.context };
 }
 
-test("settings define zero targets and dynamic chest tiers", (t) => {
+test("settings initialize defaults and chest tier choices", (t) => {
   const { settings } = loadSettings(t);
   const shop = settings.sections.find((section) => section.id === "shop");
   const dungeon = settings.sections.find((section) => section.id === "dungeon");

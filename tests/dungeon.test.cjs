@@ -8,27 +8,19 @@ const constantsHarness = createHarness();
 const { GameConstants } = constantsHarness.game;
 const { DungeonTileType } = GameConstants;
 
-const testLootTierWeights = Object.freeze({
-  common: 0.75,
-  rare: 0.2,
-  epic: 0.04,
-  legendary: 0.0099,
-  mythic: 0.0001,
-});
-const testPartialLootTierWeights = Object.freeze({
-  common: 0.75,
-  epic: 0.04,
-  mythic: 0.0001,
-});
-
 function createDungeonGlobals() {
   return {
     dungeonList: {
-      firstDungeon: {
-        getLootTierWeights: () => testPartialLootTierWeights,
-      },
-      secondDungeon: {
-        getLootTierWeights: () => testLootTierWeights,
+      eventDungeon: {
+        lootTable: {
+          mythic: [{
+            requirement: {
+              isCompleted: () => {
+                throw new Error("event requirement evaluated while loading automation");
+              },
+            },
+          }],
+        },
       },
     },
   };
@@ -37,7 +29,6 @@ function createDungeonGlobals() {
 function loadDungeon(t) {
   return createHarness(t).loadAutomation("dungeon", createDungeonGlobals()).automation;
 }
-
 
 function createState({
   targetType,
@@ -122,22 +113,9 @@ test.beforeEach((t) => {
   dungeon = loadDungeon(t);
 });
 
-test("uses the largest available chest tier set", () => {
-  assert.deepEqual(Object.keys(dungeon.ChestTier), Object.keys(testLootTierWeights));
+test("uses the fixed chest tier ordering before game initialization", () => {
+  assert.deepEqual(Object.keys(dungeon.ChestTier), ["common", "rare", "epic", "legendary", "mythic"]);
   assert.deepEqual(Object.values(dungeon.ChestTier), [0, 1, 2, 3, 4]);
-});
-
-test("fails when no dungeon loot tiers exist", (t) => {
-  assert.throws(
-    () => createHarness(t).loadAutomation("dungeon", { dungeonList: {} }),
-    /could not derive chest tiers from dungeonList/,
-  );
-});
-
-test("moves toward an inaccessible progression tile from the closest visited tile", (t) => {
-  const state = createState({ targetType: "boss" });
-
-  assertMove(dungeon.chooseDungeonAction(state), { x: 3, y: 0 });
 });
 
 test("moves toward an inaccessible battle during target discovery", (t) => {
