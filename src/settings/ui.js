@@ -8,6 +8,21 @@ function normalizeNonNegativeInteger(value) {
   return Math.min(Math.trunc(number), Number.MAX_SAFE_INTEGER);
 }
 
+ko.bindingHandlers.automationNonNegativeInteger = {
+  init(element, valueAccessor) {
+    const observable = valueAccessor();
+    ko.utils.registerEventHandler(element, "change", () => {
+      const normalized = normalizeNonNegativeInteger(element.value);
+      element.value = normalized;
+      observable(normalized);
+    });
+  },
+
+  update(element, valueAccessor) {
+    element.value = ko.unwrap(valueAccessor());
+  },
+};
+
 function installAutomationSettingsTab() {
   const tabId = "settings-automation";
 
@@ -66,7 +81,7 @@ function installAutomationSettingsTab() {
               <!-- /ko -->
               <!-- ko if: type === "nonNegativeInteger" -->
               <input class="form-control" type="number" min="0" max="${Number.MAX_SAFE_INTEGER}" step="1"
-                data-bind="value: value, enable: $parent.enabled, event: { change: function(_, event) { var normalized = normalizeNonNegativeInteger(event.target.value); event.target.value = normalized; value(normalized); } }, attr: { id: 'automation-' + $parent.id + '-' + id, 'aria-label': label }">
+                data-bind="automationNonNegativeInteger: value, enable: $parent.enabled, attr: { id: 'automation-' + $parent.id + '-' + id, 'aria-label': label }">
               <!-- /ko -->
               <!-- ko if: type === "enum" -->
               <select class="form-control" data-bind="value: value, options: values, optionsText: function(value) { return value.charAt(0).toUpperCase() + value.slice(1); }, enable: $parent.enabled, attr: { id: 'automation-' + $parent.id + '-' + id, 'aria-label': label }"></select>
