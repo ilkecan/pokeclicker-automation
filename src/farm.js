@@ -6,13 +6,20 @@ const farm = (() => {
   function catchWanderer(plot) {
     const { wanderer } = plot;
     const gooey = MulchType.Gooey_Mulch;
+    const caught = App.game.party.alreadyCaughtPokemonByName(wanderer.name);
+    const pokerus = caught ? App.game.party.getPokemonByName(wanderer.name).pokerus : GameConstants.Pokerus.Uninfected;
 
-    const priority = wanderer.shiny || !App.game.party.alreadyCaughtPokemonByName(wanderer.name);
+    const priority = _or([
+      !caught,
+      pokerus === GameConstants.Pokerus.Contagious,
+      wanderer.shiny,
+    ])
+
     const shouldMulch = _and([
-      AutomationSettings.getValue(SETTINGS_SECTION, "useGooeyMulch"),
-      priority,
-      plot.mulch === MulchType.None,
       App.game.farming.hasMulch(gooey),
+      AutomationSettings.getValue(SETTINGS_SECTION, "useGooeyMulch"),
+      plot.mulch === MulchType.None,
+      priority,
     ])
 
     if (shouldMulch) {

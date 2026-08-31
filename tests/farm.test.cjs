@@ -5,7 +5,7 @@ const test = require("node:test");
 const { createHarness } = require("./lib/harness.cjs");
 
 const constantsHarness = createHarness();
-const { ko } = constantsHarness.game;
+const { GameConstants, ko } = constantsHarness.game;
 
 const BerryType = { None: "none" };
 const PlotStage = { Berry: "berry" };
@@ -14,6 +14,7 @@ const MulchType = { None: "none", Gooey_Mulch: "gooey" };
 function loadFarm(t, {
   wanderer = { name: "Pikachu", shiny: true },
   caught = false,
+  pokerus = GameConstants.Pokerus.Uninfected,
   mulch = MulchType.None,
   inventory = true,
   useGooey = true,
@@ -56,7 +57,10 @@ function loadFarm(t, {
           },
           handleWanderer: (target) => events.push(["catch", target.index]),
         },
-        party: { alreadyCaughtPokemonByName: () => caught },
+        party: {
+          alreadyCaughtPokemonByName: () => caught,
+          getPokemonByName: () => caught ? { pokerus } : undefined,
+        },
       },
     },
     BerryType,
@@ -77,6 +81,24 @@ function run(t, options) {
 test("priority wanderers receive Gooey Mulch before catch handling", (t) => {
   assert.deepEqual(run(t), [["mulch", "gooey"], ["catch", 3]]);
   assert.deepEqual(run(t, { wanderer: { name: "Pikachu", shiny: false } }), [["mulch", "gooey"], ["catch", 3]]);
+});
+
+test("caught wanderers only receive Gooey Mulch while contagious", (t) => {
+  assert.deepEqual(run(t, {
+    wanderer: { name: "Pikachu", shiny: false },
+    caught: true,
+    pokerus: GameConstants.Pokerus.Infected,
+  }), [["catch", 3]]);
+  assert.deepEqual(run(t, {
+    wanderer: { name: "Pikachu", shiny: false },
+    caught: true,
+    pokerus: GameConstants.Pokerus.Contagious,
+  }), [["mulch", "gooey"], ["catch", 3]]);
+  assert.deepEqual(run(t, {
+    wanderer: { name: "Pikachu", shiny: false },
+    caught: true,
+    pokerus: GameConstants.Pokerus.Resistant,
+  }), [["catch", 3]]);
 });
 
 test("non-priority, already mulched, empty-inventory, and disabled cases catch immediately", (t) => {
