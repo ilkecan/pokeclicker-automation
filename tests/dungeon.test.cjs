@@ -354,3 +354,148 @@ test("keeps normal exploration when no target is available", (t) => {
   );
   assert.equal(hasVisitedNeighbor, true);
 });
+
+function loadRestartDungeon(t, {
+  smartAutoRestart = true,
+  restartUponLoss = true,
+  restartUponWin = true,
+  achievementsComplete = true,
+  pokemonComplete = true,
+  possiblePokemon = ["Pikachu"],
+  quest = null,
+  timeLeft = 1,
+  entrance = false,
+  guidesHired = false,
+  dungeonFinished = true,
+} = {}) {
+  const harness = createHarness(t);
+  const { ko } = harness.game;
+  const sectionEnabled = ko.observable(true);
+  const currentQuests = ko.observable([]);
+  const initialized = [];
+  const includeShinyValues = [];
+  const settings = {
+    smartAutoRestart,
+    restartUponLoss,
+    restartUponWin,
+  };
+  const target = {
+    name: "Test Dungeon",
+    allAvailablePokemon: () => possiblePokemon,
+  };
+  const dungeonTimeLeft = ko.observable(timeLeft);
+  const finished = ko.observable(dungeonFinished);
+  const currentTileType = ko.observable(entrance ? GameConstants.DungeonTileType.entrance : "boss");
+  const DungeonRunner = {
+    timeLeft: dungeonTimeLeft,
+    timeLeftPercentage: ko.observable(0),
+    dungeonFinished: finished,
+    isAchievementsComplete: () => achievementsComplete,
+    initializeDungeon(dungeon) {
+      initialized.push(dungeon);
+      finished(false);
+    },
+    map: {
+      currentTile: () => ({ type: currentTileType }),
+    },
+  };
+  const context = {
+    App: {
+      game: {
+        gameState: "town",
+        quests: { currentQuests },
+      },
+    },
+    AutomationSettings: {
+      enabled: () => sectionEnabled,
+      getValue: (_section, id) => settings[id],
+    },
+    DefeatDungeonQuest: class DefeatDungeonQuest {},
+    DungeonGuides: { hired: () => guidesHired },
+    DungeonRunner,
+    GameConstants: {
+      GameState: { dungeon: "dungeon" },
+      DungeonTileType: { entrance: "entrance" },
+    },
+    RouteHelper: {
+      listCompleted: (_pokemon, includeShiny) => {
+        includeShinyValues.push(includeShiny);
+        return pokemonComplete;
+      },
+    },
+    player: { town: { dungeon: target } },
+  };
+
+  if (quest) {
+    const dungeonQuest = new context.DefeatDungeonQuest();
+    const questCompleted = ko.observable(quest.completed);
+    dungeonQuest.dungeon = quest.dungeon;
+    dungeonQuest.isCompleted = () => questCompleted();
+    currentQuests([dungeonQuest]);
+  }
+
+  const dungeon = harness.loadAutomation("dungeon", {
+    ...context,
+    dungeonList: {},
+  }).automation;
+  dungeon.automate();
+  harness.addCleanup(() => sectionEnabled(false));
+
+  return { dungeon, includeShinyValues, initialized, target };
+}
+
+function assertDungeonRestart(t, expected, options = {}) {
+  const state = loadRestartDungeon(t, options);
+  assert.equal(state.initialized.length > 0, expected);
+  return state;
+}
+
+test("smart dungeon restart requires every completion condition", (t) => {
+  for (const condition of ["achievementsComplete", "quest", "pokemonComplete"]) {
+    const options = {};
+    if (condition === "achievementsComplete") options.achievementsComplete = false;
+    if (condition === "pokemonComplete") options.pokemonComplete = false;
+    if (condition === "quest") options.quest = { dungeon: "Test Dungeon", completed: false };
+    assertDungeonRestart(t, true, options);
+  }
+  assertDungeonRestart(t, false);
+});
+
+test("completed matching quests do not block smart completion", (t) => {
+  assertDungeonRestart(t, false, {
+    quest: { dungeon: "Test Dungeon", completed: true },
+  });
+});
+
+test("other dungeon quests and empty Pokemon lists do not block completion", (t) => {
+  const state = assertDungeonRestart(t, false, {
+    quest: { dungeon: "Other Dungeon", completed: false },
+    pokemonComplete: true,
+  });
+  assert.deepEqual(state.includeShinyValues, [false]);
+
+  const empty = assertDungeonRestart(t, false, { possiblePokemon: [] });
+  assert.deepEqual(empty.includeShinyValues, [false]);
+});
+
+test("loss and win settings independently gate smart restart", (t) => {
+  assertDungeonRestart(t, true, { timeLeft: -1, achievementsComplete: false });
+  assertDungeonRestart(t, false, {
+    timeLeft: -1,
+    restartUponLoss: false,
+    achievementsComplete: false,
+  });
+  assertDungeonRestart(t, true, { timeLeft: 1, achievementsComplete: false });
+  assertDungeonRestart(t, false, {
+    timeLeft: 1,
+    restartUponWin: false,
+    achievementsComplete: false,
+  });
+  assertDungeonRestart(t, true, { smartAutoRestart: false });
+});
+
+test("entrance, guides, and unfinished dungeons prevent restart", (t) => {
+  assertDungeonRestart(t, false, { entrance: true });
+  assertDungeonRestart(t, false, { guidesHired: true });
+  assertDungeonRestart(t, false, { dungeonFinished: false });
+});

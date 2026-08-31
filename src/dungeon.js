@@ -457,6 +457,23 @@ const dungeon = (() => {
     DungeonRunner.initializeDungeon(player.town.dungeon);
   }
 
+  function areDungeonPokemonComplete(dungeon) {
+    const includeShiny = false;
+    return RouteHelper.listCompleted(dungeon.allAvailablePokemon(), includeShiny);
+  }
+
+  function dungeonNeedsRestart(dungeon) {
+    return _or([
+      App.game.quests.currentQuests().some((quest) => _and([
+        !quest.isCompleted(),
+        quest instanceof DefeatDungeonQuest,
+        quest.dungeon === dungeon.name,
+      ])),
+      !DungeonRunner.isAchievementsComplete(dungeon),
+      !areDungeonPokemonComplete(dungeon),
+    ]);
+  }
+
   function restartDungeon() {
     const canStart = ko.pureComputed(() => _and([
       !DungeonGuides.hired(),
@@ -465,6 +482,14 @@ const dungeon = (() => {
     ]));
 
     const subscription = _whenReady(canStart, () => {
+      const dungeon = player.town.dungeon;
+      if (_and([
+        AutomationSettings.getValue(SETTINGS_SECTION, "smartAutoRestart"),
+        !dungeonNeedsRestart(dungeon),
+      ])) {
+        return;
+      }
+
       if (DungeonRunner.timeLeft() <= 0) {
         if (AutomationSettings.getValue(SETTINGS_SECTION, "restartUponLoss")) {
           enterDungeon();

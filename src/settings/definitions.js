@@ -14,6 +14,7 @@ const settingsDefinitions = (() => {
         { id: "restartUponLoss", label: "Restart the dungeon upon lost", type: "boolean", defaultValue: true },
         { id: "restartUponWin", label: "Restart the dungeon upon win", type: "boolean", defaultValue: true },
         { id: "searchAllChests", label: "Search for all chests", type: "boolean", defaultValue: true },
+        { id: "smartAutoRestart", label: "Stop auto restart when there is no further quest, achievement or pokemon to catch", type: "boolean", defaultValue: false },
       ],
     },
     {
