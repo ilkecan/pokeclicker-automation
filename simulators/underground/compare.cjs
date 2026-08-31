@@ -24,25 +24,25 @@ function parseArgs(argv) {
     const argument = argv[index];
     if (argument === '--baseline' || argument === '--candidate') {
       index += 1;
-      if (index >= argv.length) throw new Error(`${argument} expects a path`);
+      if (index >= argv.length) throw new Error(`[pokeclicker-automation] compare: ${argument} expects a path`);
       if (argument === '--baseline') {
-        if (baseline !== undefined) throw new Error('--baseline may only be specified once');
+        if (baseline !== undefined) throw new Error('[pokeclicker-automation] compare: --baseline may only be specified once');
         baseline = argv[index];
       } else {
-        if (candidate !== undefined) throw new Error('--candidate may only be specified once');
+        if (candidate !== undefined) throw new Error('[pokeclicker-automation] compare: --candidate may only be specified once');
         candidate = argv[index];
       }
     } else if (argument === '--help') {
       return { help: true };
     } else if (argument === '--shared-rng') {
-      throw new Error('--shared-rng cannot provide paired boards for comparison');
+      throw new Error('[pokeclicker-automation] compare: --shared-rng cannot provide paired boards for comparison');
     } else if (argument === '--automation') {
-      throw new Error('--automation is controlled by --baseline and --candidate');
+      throw new Error('[pokeclicker-automation] compare: --automation is controlled by --baseline and --candidate');
     } else {
       simulatorArgs.push(argument);
     }
   }
-  if (!baseline || !candidate) throw new Error('--baseline and --candidate are required');
+  if (!baseline || !candidate) throw new Error('[pokeclicker-automation] compare: --baseline and --candidate are required');
   return { baseline, candidate, simulatorArgs };
 }
 
@@ -58,19 +58,19 @@ function run(label, automationPath, simulatorArgs, reportFile) {
     stdio: ['ignore', 'ignore', 'pipe'],
   });
   if (result.error) {
-    throw new Error(`${label} could not start: ${result.error.message}`);
+    throw new Error(`[pokeclicker-automation] compare: ${label} could not start: ${result.error.message}`);
   }
   if (result.status !== 0) {
     const detail = result.stderr?.trim() || `exit status ${result.status}${result.signal ? `, signal ${result.signal}` : ''}`;
-    throw new Error(`${label} failed:\n${detail}`);
+    throw new Error(`[pokeclicker-automation] compare: ${label} failed:\n${detail}`);
   }
   if (!fs.existsSync(reportFile)) {
-    throw new Error(`${label} completed without producing its report file`);
+    throw new Error(`[pokeclicker-automation] compare: ${label} completed without producing its report file`);
   }
   try {
     return JSON.parse(fs.readFileSync(reportFile, 'utf8'));
   } catch (error) {
-    throw new Error(`${label} produced an invalid report: ${error.message}`);
+    throw new Error(`[pokeclicker-automation] compare: ${label} produced an invalid report: ${error.message}`);
   }
 }
 
@@ -85,7 +85,7 @@ function formatRatio(value) {
 function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) {
-    console.log(usage());
+    console.log(`[pokeclicker-automation] compare: ${usage()}`);
     return;
   }
 
@@ -101,7 +101,7 @@ function main() {
   const baselineBoards = baseline.mines.map((mine) => mine.boardHash);
   const candidateBoards = candidate.mines.map((mine) => mine.boardHash);
   if (JSON.stringify(baselineBoards) !== JSON.stringify(candidateBoards)) {
-    throw new Error('generated boards were not paired; compare the JSON configuration and game revision');
+    throw new Error('[pokeclicker-automation] compare: generated boards were not paired; compare the JSON configuration and game revision');
   }
   const comparisons = {
     ticks: ratio(candidate.totals.ticks, baseline.totals.ticks),
@@ -114,23 +114,23 @@ function main() {
     wallTime: ratio(candidate.performance.elapsedMs, baseline.performance.elapsedMs),
   };
 
-  console.log(`Baseline:  ${baseline.automationSource.path}`);
-  console.log(`Candidate: ${candidate.automationSource.path}`);
-  console.log(`Mines: ${baseline.configuration.mines}, seed: ${baseline.configuration.seed}, level: ${baseline.configuration.level}`);
-  console.log('Boards: identical official generation in both runs');
-  console.log(`Ticks: ${baseline.totals.ticks} -> ${candidate.totals.ticks} (${formatRatio(comparisons.ticks)}, lower is better)`);
-  console.log(`Layers removed: ${baseline.totals.layersRemoved} -> ${candidate.totals.layersRemoved} (${formatRatio(comparisons.layersRemoved)})`);
-  console.log(`Items destroyed: ${baseline.totals.itemsDestroyed} -> ${candidate.totals.itemsDestroyed} (${formatRatio(comparisons.itemsDestroyed)}, lower is better)`);
-  console.log(`Policy setup: ${baseline.performance.automationSetupElapsedMs.toFixed(2)} ms -> ${candidate.performance.automationSetupElapsedMs.toFixed(2)} ms (${formatRatio(comparisons.automationSetupTime)}, lower is better)`);
-  console.log(`Policy actions: ${baseline.performance.automationActionElapsedMs.toFixed(2)} ms -> ${candidate.performance.automationActionElapsedMs.toFixed(2)} ms (${formatRatio(comparisons.automationActionTime)}, lower is better)`);
-  console.log(`Policy action time/tick: ${baseline.performance.automationActionMicrosecondsPerTick.toFixed(2)} us -> ${candidate.performance.automationActionMicrosecondsPerTick.toFixed(2)} us (${formatRatio(comparisons.automationActionTimePerTick)}, lower is better)`);
-  console.log(`Policy total: ${baseline.performance.automationElapsedMs.toFixed(2)} ms -> ${candidate.performance.automationElapsedMs.toFixed(2)} ms (${formatRatio(comparisons.automationTime)}, lower is better)`);
-  console.log(`Total runtime: ${baseline.performance.elapsedMs.toFixed(2)} ms -> ${candidate.performance.elapsedMs.toFixed(2)} ms (${formatRatio(comparisons.wallTime)})`);
+  console.log(`[pokeclicker-automation] compare: Baseline:  ${baseline.automationSource.path}`);
+  console.log(`[pokeclicker-automation] compare: Candidate: ${candidate.automationSource.path}`);
+  console.log(`[pokeclicker-automation] compare: Mines: ${baseline.configuration.mines}, seed: ${baseline.configuration.seed}, level: ${baseline.configuration.level}`);
+  console.log('[pokeclicker-automation] compare: Boards: identical official generation in both runs');
+  console.log(`[pokeclicker-automation] compare: Ticks: ${baseline.totals.ticks} -> ${candidate.totals.ticks} (${formatRatio(comparisons.ticks)}, lower is better)`);
+  console.log(`[pokeclicker-automation] compare: Layers removed: ${baseline.totals.layersRemoved} -> ${candidate.totals.layersRemoved} (${formatRatio(comparisons.layersRemoved)})`);
+  console.log(`[pokeclicker-automation] compare: Items destroyed: ${baseline.totals.itemsDestroyed} -> ${candidate.totals.itemsDestroyed} (${formatRatio(comparisons.itemsDestroyed)}, lower is better)`);
+  console.log(`[pokeclicker-automation] compare: Policy setup: ${baseline.performance.automationSetupElapsedMs.toFixed(2)} ms -> ${candidate.performance.automationSetupElapsedMs.toFixed(2)} ms (${formatRatio(comparisons.automationSetupTime)}, lower is better)`);
+  console.log(`[pokeclicker-automation] compare: Policy actions: ${baseline.performance.automationActionElapsedMs.toFixed(2)} ms -> ${candidate.performance.automationActionElapsedMs.toFixed(2)} ms (${formatRatio(comparisons.automationActionTime)}, lower is better)`);
+  console.log(`[pokeclicker-automation] compare: Policy action time/tick: ${baseline.performance.automationActionMicrosecondsPerTick.toFixed(2)} us -> ${candidate.performance.automationActionMicrosecondsPerTick.toFixed(2)} us (${formatRatio(comparisons.automationActionTimePerTick)}, lower is better)`);
+  console.log(`[pokeclicker-automation] compare: Policy total: ${baseline.performance.automationElapsedMs.toFixed(2)} ms -> ${candidate.performance.automationElapsedMs.toFixed(2)} ms (${formatRatio(comparisons.automationTime)})`);
+  console.log(`[pokeclicker-automation] compare: Total runtime: ${baseline.performance.elapsedMs.toFixed(2)} ms -> ${candidate.performance.elapsedMs.toFixed(2)} ms (${formatRatio(comparisons.wallTime)})`);
 }
 
 try {
   main();
 } catch (error) {
-  console.error(`compare: ${error.stack || error.message}`);
+  console.error(`[pokeclicker-automation] compare: ${error.stack || error.message}`);
   process.exitCode = 1;
 }

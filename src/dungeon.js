@@ -14,7 +14,7 @@ const dungeon = (() => {
     }
 
     if (selected.tierCount === 0) {
-      throw new Error("Could not derive chest tiers from dungeonList");
+      throw new Error("[pokeclicker-automation] dungeon: could not derive chest tiers from dungeonList");
     }
 
     return Object.freeze(Object.fromEntries(
@@ -180,7 +180,7 @@ const dungeon = (() => {
       case GameConstants.DungeonTileType.ladder:
         return interactAction(Interaction.LADDER);
       default:
-        console.error("dungeon: unknown progression tile!");
+        console.error("[pokeclicker-automation] dungeon: unknown progression tile!");
     }
   }
 

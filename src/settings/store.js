@@ -17,10 +17,10 @@ const AutomationSettings = (() => {
   function validateValue(value, type, path, values) {
     const validator = valueValidators[type];
     if (!validator) {
-      throw new Error(`Unknown value type \`${type}\` for \`${path}\``);
+      throw new Error(`[pokeclicker-automation] settings: unknown value type \`${type}\` for \`${path}\``);
     }
     if (!validator(value, values)) {
-      throw new Error(`Invalid ${type} value for \`${path}\``);
+      throw new Error(`[pokeclicker-automation] settings: invalid ${type} value for \`${path}\``);
     }
   }
 
@@ -58,7 +58,7 @@ const AutomationSettings = (() => {
   function getSection(sectionId) {
     const section = sectionsById.get(sectionId);
     if (!section) {
-      throw new Error(`Unknown automation section: ${sectionId}`);
+      throw new Error(`[pokeclicker-automation] settings: unknown automation section: ${sectionId}`);
     }
     return section;
   }
@@ -66,7 +66,7 @@ const AutomationSettings = (() => {
   function getOption(section, optionId) {
     const option = section.optionsById.get(optionId);
     if (!option) {
-      throw new Error(`Unknown ${section.id} automation option: ${optionId}`);
+      throw new Error(`[pokeclicker-automation] settings: unknown ${section.id} automation option: ${optionId}`);
     }
     return option;
   }
@@ -131,22 +131,22 @@ const AutomationSettings = (() => {
 
   function validateEnvelope(json) {
     if (!isRecord(json)) {
-      throw new Error("Stored value is not an object");
+      throw new Error("[pokeclicker-automation] settings: stored value is not an object");
     }
 
     if (json.version !== STORAGE_VERSION) {
-      throw new Error(`Unknown storage version: ${json.version}`);
+      throw new Error(`[pokeclicker-automation] settings: unknown storage version: ${json.version}`);
     }
   }
 
   function validate(settings) {
     if (!isRecord(settings)) {
-      throw new Error("Stored settings are not an object");
+      throw new Error("[pokeclicker-automation] settings: stored settings are not an object");
     }
 
     for (const [sectionId, storedSection] of Object.entries(settings)) {
       if (!isRecord(storedSection)) {
-        throw new Error(`Stored section \`${sectionId}\` is not an object`);
+        throw new Error(`[pokeclicker-automation] settings: stored section \`${sectionId}\` is not an object`);
       }
       validateValue(storedSection.enabled, "boolean", `${sectionId}.enabled`);
 
@@ -179,7 +179,7 @@ const AutomationSettings = (() => {
     try {
       localStorage.setItem(storageKey, serialize(capture()));
     } catch (error) {
-      console.error("[pokeclicker-automation] failed to save settings", error);
+      console.error("[pokeclicker-automation] settings: failed to save settings", error);
     }
   }
 
@@ -192,7 +192,7 @@ const AutomationSettings = (() => {
 
       apply(deserialize(text));
     } catch (error) {
-      console.warn("[pokeclicker-automation] failed to load settings", error);
+      console.warn("[pokeclicker-automation] settings: failed to load settings", error);
     }
   }
 

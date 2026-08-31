@@ -48,7 +48,7 @@ function createVirtualClock() {
     },
 
     installGlobalTimers(target = globalThis) {
-      if (installedTarget) throw new Error('virtual clock timers are already installed');
+      if (installedTarget) throw new Error('[pokeclicker-automation] virtual-clock: virtual clock timers are already installed');
       installedTarget = target;
       originalSetTimeout = target.setTimeout;
       originalClearTimeout = target.clearTimeout;
@@ -65,7 +65,7 @@ function createVirtualClock() {
 
     advanceToNext(externalEventAt, externalCallback) {
       if (!Number.isFinite(externalEventAt) || externalEventAt < now) {
-        throw new Error(`external event time must be finite and at least ${now}, got ${externalEventAt}`);
+      throw new Error(`[pokeclicker-automation] virtual-clock: external event time must be finite and at least ${now}, got ${externalEventAt}`);
       }
       discardCancelledTimers();
       const timer = timers[0];

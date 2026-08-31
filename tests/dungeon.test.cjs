@@ -130,7 +130,7 @@ test("uses the largest available chest tier set", () => {
 test("fails when no dungeon loot tiers exist", (t) => {
   assert.throws(
     () => createHarness(t).loadAutomation("dungeon", { dungeonList: {} }),
-    /Could not derive chest tiers from dungeonList/,
+    /could not derive chest tiers from dungeonList/,
   );
 });
 

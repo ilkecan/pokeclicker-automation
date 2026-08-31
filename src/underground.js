@@ -650,7 +650,7 @@ const underground = (() => {
     }
 
     if (!bestRecord) {
-      console.error("underground: the hammer has nothing to break, digging should have stopped when the mine completed");
+      console.error("[pokeclicker-automation] underground: the hammer has nothing to break, digging should have stopped when the mine completed");
       return null;
     }
 
@@ -702,7 +702,7 @@ const underground = (() => {
 
     const record = pickTileToChisel(allTileRecords, weights);
     if (!record) {
-      console.error("underground: the chisel has nothing to dig, digging should have stopped when the mine completed");
+      console.error("[pokeclicker-automation] underground: the chisel has nothing to dig, digging should have stopped when the mine completed");
       return null;
     }
 

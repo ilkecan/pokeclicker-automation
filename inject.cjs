@@ -41,7 +41,7 @@ async function fetchRemote(url) {
 
   const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`Failed to fetch @require ${url}: ${res.status} ${res.statusText}`);
+    throw new Error(`[pokeclicker-automation] inject: failed to fetch @require ${url}: ${res.status} ${res.statusText}`);
   }
 
   const text = await res.text();
@@ -84,7 +84,7 @@ async function buildPayload(entrySource) {
     // declarations across files are mutually hoisted regardless of order.
     ${parts.join('\n')}
     ${entrySource}
-    console.log('[pokeclicker-automation] injected OK');
+    console.log('[pokeclicker-automation] inject: injected OK');
   }
 
   // did-finish-load fires after window "load", which is strictly after DOMContentLoaded,
@@ -94,7 +94,7 @@ async function buildPayload(entrySource) {
   // main.js navigating directly to the real game page, with no intermediate
   // splash/loading navigation first. If some wrapper does that, did-finish-load would
   // fire early for that intermediate, Game-less page and this assumption would break.
-  run().catch((e) => console.error('[pokeclicker-automation] injection error', e));
+  run().catch((e) => console.error('[pokeclicker-automation] inject: injection error', e));
 })();`;
 }
 
@@ -112,7 +112,7 @@ setImmediate(() => {
       const matches = getMatches(entrySource);
       const url = window.webContents.getURL();
       if (matches.length && !matches.some((re) => re.test(url))) {
-        console.log('[pokeclicker-automation] skipping injection, URL does not match @match:', url);
+        console.log('[pokeclicker-automation] inject: skipping injection, URL does not match @match:', url);
         return;
       }
 
@@ -120,14 +120,14 @@ setImmediate(() => {
         const payload = await buildPayload(entrySource);
         await window.webContents.executeJavaScript(payload);
       } catch (e) {
-        console.error('[pokeclicker-automation] injection failed', e);
+        console.error('[pokeclicker-automation] inject: injection failed', e);
       }
     });
 
     window.webContents.on('console-message', (event) => {
-      console.log(event)
+      console.log('[pokeclicker-automation] inject: page console event', event);
       const method = event.level === 'warning' ? 'warn' : event.level;
-      console[method](`[page console] ${event.message} (${event.sourceId}:${event.lineNumber})`);
+      console[method](`[pokeclicker-automation] inject: page console: ${event.message} (${event.sourceId}:${event.lineNumber})`);
     });
   });
 });
