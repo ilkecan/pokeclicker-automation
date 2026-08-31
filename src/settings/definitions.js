@@ -32,6 +32,7 @@ const settingsDefinitions = (() => {
       defaultValue: true,
       options: [
         { id: "autoRestart", label: "Auto restart gym", type: "boolean", defaultValue: true },
+        { id: "smartAutoRestart", label: "Stop auto restart when there is no further quest or achievement", type: "boolean", defaultValue: true },
       ],
     },
     {
