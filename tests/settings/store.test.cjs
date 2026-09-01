@@ -28,28 +28,35 @@ function loadSettings(t, stored = null) {
       },
     },
     ...createDungeonGlobals(),
+    ItemList: new Proxy({}, {
+      get: (_target, itemName) => ({ displayName: itemName.replaceAll("_", " ") }),
+    }),
     console: { warn() {}, error() {} },
   };
   const loaded = createHarness(t).loadScripts(
-    ["src/common.js", "src/dungeon.js", "src/settings/definitions.js", "src/settings/store.js"],
+    ["src/common.js", "src/dungeon.js", "src/shop.js", "src/settings/definitions.js", "src/settings/store.js"],
     context,
-    "AutomationSettings",
+    "({ settings: AutomationSettings, shop })",
   );
-  loaded.value.initialize();
-  return { settings: loaded.value, storage, runtime: loaded.context };
+  loaded.value.settings.initialize();
+  return { settings: loaded.value.settings, storage, runtime: loaded.value };
 }
 
 test("settings initialize defaults and chest tier choices", (t) => {
-  const { settings } = loadSettings(t);
+  const { settings, runtime } = loadSettings(t);
   const shop = settings.sections.find((section) => section.id === "shop");
   const dungeon = settings.sections.find((section) => section.id === "dungeon");
   const chestTier = dungeon.options.find((option) => option.id === "minimumChestTier");
-  assert.equal(settings.getValue("shop", "targetPokeball"), 0);
-  assert.equal(settings.getValue("shop", "targetGreatball"), 0);
-  assert.equal(settings.getValue("shop", "targetUltraball"), 0);
+  assert.deepEqual(
+    shop.options.map((option) => option.id),
+    runtime.shop.ITEM_NAMES.map((itemName) => `target${itemName}`),
+  );
+  for (const itemName of runtime.shop.ITEM_NAMES) {
+    assert.equal(settings.getValue("shop", `target${itemName}`), 0);
+  }
   assert.equal(settings.getValue("dungeon", "minimumChestTier"), "common");
   assert.deepEqual([...chestTier.values], Object.keys(testLootTierWeights));
-  assert.equal(shop.options.length, 3);
+  assert.equal(shop.options.length, runtime.shop.ITEM_NAMES.length);
 });
 
 test("invalid persisted number and enum values fail closed", (t) => {

@@ -2,7 +2,19 @@
 
 const shop = (() => {
   const SETTINGS_SECTION = "shop";
-  const ITEM_NAMES = ["Pokeball", "Greatball", "Ultraball"];
+  const ITEM_NAMES = [
+    "Pokeball",
+    "Greatball",
+    "Ultraball",
+    "Boost_Mulch",
+    "Rich_Mulch",
+    "Surprise_Mulch",
+    "Amaze_Mulch",
+    "Freeze_Mulch",
+    "Gooey_Mulch",
+    "Berry_Shovel",
+    "Mulch_Shovel",
+  ];
 
   function synchronizeItemPrice(item) {
     const multiplier = player.itemMultipliers[item.saveName] || 1;
@@ -48,7 +60,17 @@ const shop = (() => {
     const items = pokeMartShop.items
       .filter((item) => targetByName.has(item.name))
       .sort((a, b) => b.basePrice - a.basePrice);
-    return items.flatMap((item) => buyItem(item, targetByName.get(item.name)));
+    return items.flatMap((item) => {
+      let subscriptions = [];
+      const availabilitySubscription = ko.when(() => item.isAvailable(), () => {
+        subscriptions = buyItem(item, targetByName.get(item.name));
+      });
+      return [
+        availabilitySubscription,
+        // `subscriptions` change dynamically, so we need a closure instead of a copied array
+        { dispose() { _disposeAll(subscriptions); } },
+      ];
+    });
   }
 
   function automate() {
@@ -59,6 +81,7 @@ const shop = (() => {
   };
 
   return {
+    ITEM_NAMES,
     automate,
   }
 })();

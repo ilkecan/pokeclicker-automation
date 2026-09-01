@@ -18,16 +18,20 @@ function loadShop(t, {
     targetPokeball: ko.observable(targets.Pokeball ?? 0),
     targetGreatball: ko.observable(targets.Greatball ?? 0),
     targetUltraball: ko.observable(targets.Ultraball ?? 0),
+    targetBoost_Mulch: ko.observable(targets.Boost_Mulch ?? 0),
+    targetRich_Mulch: ko.observable(targets.Rich_Mulch ?? 0),
+    targetSurprise_Mulch: ko.observable(targets.Surprise_Mulch ?? 0),
+    targetAmaze_Mulch: ko.observable(targets.Amaze_Mulch ?? 0),
+    targetFreeze_Mulch: ko.observable(targets.Freeze_Mulch ?? 0),
+    targetGooey_Mulch: ko.observable(targets.Gooey_Mulch ?? 0),
+    targetBerry_Shovel: ko.observable(targets.Berry_Shovel ?? 0),
+    targetMulch_Shovel: ko.observable(targets.Mulch_Shovel ?? 0),
   };
   const sectionEnabled = ko.observable(enabled);
   const settings = {
     sections: [{
       id: "shop",
-      options: [
-        { id: "targetPokeball", type: "nonNegativeInteger", value: values.targetPokeball },
-        { id: "targetGreatball", type: "nonNegativeInteger", value: values.targetGreatball },
-        { id: "targetUltraball", type: "nonNegativeInteger", value: values.targetUltraball },
-      ],
+      options: Object.keys(values).map((id) => ({ id, type: "nonNegativeInteger", value: values[id] })),
     }],
     value: (_section, id) => values[id],
     getValue: (_section, id) => values[id](),
@@ -36,9 +40,10 @@ function loadShop(t, {
   const money = ko.observable(currency);
   const itemsByName = new Map();
 
-  const makeBall = ({ name, basePrice, multiplier = 1, bag = 0 }) => {
+  const makeBall = ({ name, basePrice, multiplier = 1, bag = 0, available = true }) => {
     const item = {};
     const bagChanged = ko.observable(0);
+    const availability = ko.observable(available);
     let bagAmount = bag;
     item.name = name;
     item.basePrice = basePrice;
@@ -46,6 +51,8 @@ function loadShop(t, {
     item.currency = "money";
     item.saveName = name;
     item.price = ko.observable(basePrice);
+    item.isAvailable = () => availability();
+    item.setAvailable = availability;
     item.getBagAmount = () => {
       bagChanged();
       return bagAmount;
@@ -102,6 +109,61 @@ test("maps each ball to its configured target and buys only deficits", (t) => {
   assert.equal(state.balls.get("Greatball").getBagAmount(), 1);
   assert.equal(state.balls.get("Ultraball").getBagAmount(), 1);
   assert.deepEqual(state.balls.get("Greatball").buys, [1]);
+});
+
+test("maps mulch and shovel items to their configured targets", (t) => {
+  const names = [
+    "Boost_Mulch",
+    "Rich_Mulch",
+    "Surprise_Mulch",
+    "Amaze_Mulch",
+    "Freeze_Mulch",
+    "Gooey_Mulch",
+    "Berry_Shovel",
+    "Mulch_Shovel",
+  ];
+  const state = loadShop(t, {
+    targets: Object.fromEntries(names.map((name) => [name, 1])),
+    balls: names.map((name, index) => ({ name, basePrice: 10 + index })),
+  });
+  state.shop.automate();
+  for (const name of names) {
+    assert.deepEqual(state.balls.get(name).buys, [1]);
+  }
+});
+
+test("waits for hidden mulch and shovel items to become available", (t) => {
+  const state = loadShop(t, {
+    targets: { Boost_Mulch: 1, Mulch_Shovel: 1 },
+    balls: [
+      { name: "Boost_Mulch", basePrice: 50, available: false },
+      { name: "Mulch_Shovel", basePrice: 300, available: false },
+    ],
+  });
+  state.shop.automate();
+  assert.deepEqual(state.balls.get("Boost_Mulch").buys, []);
+  assert.deepEqual(state.balls.get("Mulch_Shovel").buys, []);
+
+  state.balls.get("Boost_Mulch").setAvailable(true);
+  ko.tasks.runEarly();
+  assert.deepEqual(state.balls.get("Boost_Mulch").buys, [1]);
+  assert.deepEqual(state.balls.get("Mulch_Shovel").buys, []);
+});
+
+test("disposing hidden item subscriptions prevents later purchases", (t) => {
+  const state = loadShop(t, {
+    targets: { Boost_Mulch: 1 },
+    balls: [{ name: "Boost_Mulch", basePrice: 50, available: false }],
+  });
+  state.shop.automate();
+  state.sectionEnabled(false);
+  state.balls.get("Boost_Mulch").setAvailable(true);
+  ko.tasks.runEarly();
+  assert.deepEqual(state.balls.get("Boost_Mulch").buys, []);
+
+  state.sectionEnabled(true);
+  ko.tasks.runEarly();
+  assert.deepEqual(state.balls.get("Boost_Mulch").buys, [1]);
 });
 
 test("zero, equal, and above targets do not buy", (t) => {

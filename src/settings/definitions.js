@@ -68,11 +68,12 @@ const settingsDefinitions = (() => {
       id: "shop",
       label: "Shop",
       defaultValue: true,
-      options: [
-        { id: "targetPokeball", label: "Poke Ball target", type: "nonNegativeInteger", defaultValue: 0 },
-        { id: "targetGreatball", label: "Great Ball target", type: "nonNegativeInteger", defaultValue: 0 },
-        { id: "targetUltraball", label: "Ultra Ball target", type: "nonNegativeInteger", defaultValue: 0 },
-      ],
+      options: shop.ITEM_NAMES.map((itemName) => ({
+        id: `target${itemName}`,
+        label: `${ItemList[itemName].displayName} target`,
+        type: "nonNegativeInteger",
+        defaultValue: 0,
+      })),
     },
     {
       id: "underground",
