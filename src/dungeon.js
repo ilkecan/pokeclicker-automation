@@ -142,6 +142,39 @@ const dungeon = (() => {
     return findTileByType(state, type, { accessible: false });
   }
 
+  function isChestToOpen(tile, minimumChestTier) {
+    return _and([
+      tile.type === GameConstants.DungeonTileType.chest,
+      ChestTier[tile.chestTier] >= ChestTier[minimumChestTier],
+    ]);
+  }
+
+  function findChestThatCanRevealFloor(state) {
+    const { allTiles, board, chestsOpened, options, position } = state;
+    const floor = position.floor;
+    const tiles = allTiles[floor];
+    // `/ 3` is enough for revealing the chests & `/ 2` is for full floor
+    // reveal. We use the latter here.
+    const numChestsOpenedRequired = Math.ceil(board[floor].length / 2);
+    const chestsNeeded = numChestsOpenedRequired - chestsOpened[floor];
+
+    let numEligibleVisibleChests = 0;
+    let eligibleVisibleChest;
+
+    for (const tile of tiles) {
+      if (!tile.isVisible || !isChestToOpen(tile, options.minimumChestTier)) {
+        continue;
+      }
+
+      eligibleVisibleChest ??= tile;
+      numEligibleVisibleChests++;
+
+      if (numEligibleVisibleChests >= chestsNeeded) {
+        return eligibleVisibleChest;
+      }
+    }
+  }
+
   function moveAction(tile) {
     return {
       type: ActionType.MOVE,
@@ -158,12 +191,12 @@ const dungeon = (() => {
     };
   }
 
-  function progressAction(progression) {
+  function progressInteraction(progression) {
     switch (progression.type) {
       case GameConstants.DungeonTileType.boss:
-        return interactAction(Interaction.BOSS);
+        return Interaction.BOSS;
       case GameConstants.DungeonTileType.ladder:
-        return interactAction(Interaction.LADDER);
+        return Interaction.LADDER;
       default:
         console.error("[pokeclicker-automation] dungeon: unknown progression tile!");
     }
@@ -326,9 +359,16 @@ const dungeon = (() => {
     }
   }
 
+  function moveToOrInteract(position, target, interaction) {
+    return samePosition(position, target) ?
+      interactAction(interaction) :
+      moveAction(target);
+  }
+
   function chooseDungeonAction(state) {
     const { options, progression, position } = state;
 
+    // visiting unexplored accessible tiles expands future reachability
     const unvisitedNonBattleNeighbour = findUnvisitedNonBattleNeighbour(state);
     if (unvisitedNonBattleNeighbour) {
       // prefer non-battle tiles
@@ -336,6 +376,19 @@ const dungeon = (() => {
     }
 
     if (!allTargetsVisible(state)) {
+      if (!options.fightAllBattles && options.openAccessibleChests) {
+        // Open chests we would open before progressing anyway if they can
+        // reveal remaining targets sooner. This might not always be strictly
+        // positive, but I think should be preferable overall.
+        const revealChest = findChestThatCanRevealFloor(state);
+        if (revealChest) {
+          if (!isAccessible(state, revealChest)) {
+            return followTarget(state, revealChest);
+          }
+          return moveToOrInteract(position, revealChest, Interaction.CHEST);
+        }
+      }
+
       const target = findVisibleInaccessibleTarget(state);
       if (target) {
         return followTarget(state, target);
@@ -369,19 +422,15 @@ const dungeon = (() => {
 
     if (options.openAccessibleChests) {
       const chest = findTile(state, (tile) => _and([
-        ChestTier[tile.chestTier] >= ChestTier[options.minimumChestTier],
         isAccessible(state, tile),
-        tile.type === GameConstants.DungeonTileType.chest,
+        isChestToOpen(tile, options.minimumChestTier),
       ]));
       if (chest) {
-        return samePosition(position, chest) ? interactAction(Interaction.CHEST) : moveAction(chest);
+        return moveToOrInteract(position, chest, Interaction.CHEST);
       }
     }
 
-    if (!samePosition(position, progression)) {
-      return moveAction(progression);
-    }
-    return progressAction(progression);
+    return moveToOrInteract(position, progression, progressInteraction(progression));
   }
 
   function executeDungeonAction(action, map) {
