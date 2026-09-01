@@ -108,6 +108,13 @@ function assertMove(action, coordinates) {
   });
 }
 
+function assertInteract(action, interaction) {
+  assert.deepEqual({ ...action }, {
+    type: "interact",
+    interaction,
+  });
+}
+
 let dungeon;
 test.beforeEach((t) => {
   dungeon = loadDungeon(t);
@@ -267,6 +274,51 @@ test("opens accessible common chests by default", (t) => {
   });
 
   assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+});
+
+test("opens every accessible chest when the run cannot progress", (t) => {
+  const state = createState({
+    targetType: null,
+    options: { openAccessibleChests: false, minimumChestTier: "mythic" },
+    progressionPosition: [4, 0],
+    visited: [[0, 0], [1, 0], [0, 1]],
+  });
+  state.timeLeft = GameConstants.BATTLE_TICK - 1;
+
+  const firstChest = state.board[0][0][2];
+  firstChest.isVisible = true;
+  firstChest.type = DungeonTileType.chest;
+  firstChest.chestTier = "common";
+  const secondChest = state.board[0][1][1];
+  secondChest.isVisible = true;
+  secondChest.type = DungeonTileType.chest;
+  secondChest.chestTier = "common";
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 2, y: 0 });
+
+  state.position = { x: 2, y: 0, floor: 0 };
+  firstChest.isVisited = true;
+  assertInteract(dungeon.chooseDungeonAction(state), "chest");
+  firstChest.type = null;
+  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 1 });
+
+  state.position = { x: 1, y: 1, floor: 0 };
+  secondChest.isVisited = true;
+  assertInteract(dungeon.chooseDungeonAction(state), "chest");
+  secondChest.type = null;
+  assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 0 });
+});
+
+test("does not salvage chests at the battle tick boundary", (t) => {
+  const state = createState({
+    targetType: "chest",
+    targetPosition: [1, 0],
+    options: { openAccessibleChests: false },
+    progressionPosition: [4, 0],
+  });
+  state.timeLeft = GameConstants.BATTLE_TICK;
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 0 });
 });
 
 test("skips accessible common chests", (t) => {

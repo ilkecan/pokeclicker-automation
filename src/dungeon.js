@@ -61,6 +61,7 @@ const dungeon = (() => {
       battlesWon: map.floorSizes.map(() => 0),
       encountersWon: 0,
       progression: null,
+      timeLeft: Infinity,
       board,
       allTiles: board.map((floor) => floor.flat()),
     };
@@ -88,6 +89,7 @@ const dungeon = (() => {
     state.options.minimumChestTier = AutomationSettings.getValue(SETTINGS_SECTION, "minimumChestTier");
     state.options.searchAllChests = AutomationSettings.getValue(SETTINGS_SECTION, "searchAllChests");
 
+    state.timeLeft = DungeonRunner.timeLeft();
     const point = map.playerPosition();
     state.position.x = point.x;
     state.position.y = point.y;
@@ -367,6 +369,14 @@ const dungeon = (() => {
 
   function chooseDungeonAction(state) {
     const { options, progression, position } = state;
+    if (state.timeLeft < GameConstants.BATTLE_TICK) {
+      const chest = findTile(state, (tile) =>
+        tile.type === GameConstants.DungeonTileType.chest && isAccessible(state, tile)
+      );
+      if (chest) {
+        return moveToOrInteract(position, chest, Interaction.CHEST);
+      }
+    }
 
     // visiting unexplored accessible tiles expands future reachability
     const unvisitedNonBattleNeighbour = findUnvisitedNonBattleNeighbour(state);
@@ -455,8 +465,13 @@ const dungeon = (() => {
   }
 
   function takeAction(state, map) {
-    if (DungeonRunner.dungeonFinished() || DungeonRunner.timeLeft() <= 0) {
-      // either finished or failed
+    if (DungeonRunner.dungeonFinished()) {
+      // dungeon is finished
+      return;
+    }
+
+    if (state.timeLeft <= 0) {
+      // dungeon is failed
       return;
     }
 
@@ -465,14 +480,16 @@ const dungeon = (() => {
       return;
     }
 
-    updateDungeonState(state, map);
     const action = chooseDungeonAction(state);
     executeDungeonAction(action, map);
   }
 
   function completeDungeonMap(map) {
     const state = createDungeonState(map);
-    const actionSubscription = _runAndSubscribe(DungeonRunner.timeLeft, () => takeAction(state, map));
+    const actionSubscription = _runAndSubscribe(DungeonRunner.timeLeft, () => {
+      updateDungeonState(state, map);
+      takeAction(state, map);
+    });
     const disposeSubscription = ko.when(DungeonRunner.dungeonFinished, () => actionSubscription.dispose());
 
     return [
