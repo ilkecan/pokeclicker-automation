@@ -182,6 +182,82 @@ test("progresses before opening accessible chests when disabled", (t) => {
   assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 0 });
 });
 
+test("does not reveal the floor early when opening accessible chests is disabled", (t) => {
+  const state = createState({
+    targetType: "chest",
+    targetPosition: [0, 0],
+    targetChestTier: "rare",
+    options: {
+      openAccessibleChests: false,
+      minimumChestTier: "rare",
+      searchAllChests: false,
+    },
+    visited: [[0, 0]],
+  });
+  const emptyTile = state.board[0][0][1];
+  emptyTile.isVisible = true;
+  emptyTile.type = DungeonTileType.empty;
+  for (const [x, y, tier] of [[3, 4, "rare"], [4, 4, "epic"]]) {
+    const chest = state.board[0][y][x];
+    chest.isVisible = true;
+    chest.type = DungeonTileType.chest;
+    chest.chestTier = tier;
+  }
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+});
+
+
+test("does not count visible chests below the minimum tier toward revealing the floor", (t) => {
+  const state = createState({
+    targetType: "chest",
+    targetPosition: [0, 0],
+    targetChestTier: "rare",
+    options: {
+      fightAllBattles: false,
+      minimumChestTier: "rare",
+      searchAllChests: false,
+    },
+    visited: [[0, 0]],
+  });
+  const emptyTile = state.board[0][0][1];
+  emptyTile.isVisible = true;
+  emptyTile.type = DungeonTileType.empty;
+  for (const [x, y, tier] of [[3, 4, "common"], [4, 4, "epic"]]) {
+    const chest = state.board[0][y][x];
+    chest.isVisible = true;
+    chest.type = DungeonTileType.chest;
+    chest.chestTier = tier;
+  }
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+});
+
+test("does not open chests early when fighting all battles", (t) => {
+  const state = createState({
+    targetType: "chest",
+    targetPosition: [0, 0],
+    targetChestTier: "rare",
+    options: {
+      fightAllBattles: true,
+      minimumChestTier: "rare",
+      searchAllChests: false,
+    },
+    visited: [[0, 0]],
+  });
+  const emptyTile = state.board[0][0][1];
+  emptyTile.isVisible = true;
+  emptyTile.type = DungeonTileType.empty;
+  for (const [x, y] of [[3, 4], [4, 4]]) {
+    const chest = state.board[0][y][x];
+    chest.isVisible = true;
+    chest.type = DungeonTileType.chest;
+    chest.chestTier = "rare";
+  }
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+});
+
 test("opens accessible common chests by default", (t) => {
   const state = createState({
     targetType: "chest",
