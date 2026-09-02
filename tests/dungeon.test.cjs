@@ -467,6 +467,22 @@ test("prefers non-battle exploration regardless of fight-all", (t) => {
   assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
 });
 
+test("does not explore non-battle neighbours when every target is visible", (t) => {
+  const state = createState({
+    targetType: "enemy",
+    targetPosition: [1, 0],
+    options: { fightAllBattles: true },
+    targetCounts: { chests: 0, battles: 1 },
+    progressionPosition: [4, 0],
+    visited: [[0, 0], [4, 0]],
+  });
+  const emptyTile = state.board[0][1][0];
+  emptyTile.isVisible = true;
+  emptyTile.type = DungeonTileType.empty;
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+});
+
 test("keeps normal exploration when no target is available", (t) => {
   const state = createState({
     targetType: null,

@@ -378,14 +378,13 @@ const dungeon = (() => {
       }
     }
 
-    // visiting unexplored accessible tiles expands future reachability
-    const unvisitedNonBattleNeighbour = findUnvisitedNonBattleNeighbour(state);
-    if (unvisitedNonBattleNeighbour) {
-      // prefer non-battle tiles
-      return moveAction(unvisitedNonBattleNeighbour);
-    }
-
     if (!allTargetsVisible(state)) {
+      const unvisitedNonBattleNeighbour = findUnvisitedNonBattleNeighbour(state);
+      if (unvisitedNonBattleNeighbour) {
+        // visiting unexplored accessible non-battle tiles increase future accessibility
+        return moveAction(unvisitedNonBattleNeighbour);
+      }
+
       if (!options.fightAllBattles && options.openAccessibleChests) {
         // Open chests we would open before progressing anyway if they can
         // reveal remaining targets sooner. This might not always be strictly
