@@ -62,7 +62,7 @@ const dungeon = (() => {
       encountersWon: 0,
       progression: null,
       timeLeft: Infinity,
-      timeGrid: null,
+      routeGrid: null,
       board,
       allTiles: board.map((floor) => floor.flat()),
     };
@@ -107,7 +107,7 @@ const dungeon = (() => {
       updateTileState(tileState, floor[tileState.y][tileState.x]);
     }
     state.progression = progressionTile(state);
-    state.timeGrid = createTimeGrid(state);
+    state.routeGrid = createRouteGrid(state);
   }
 
   function samePosition(a, b) {
@@ -143,29 +143,29 @@ const dungeon = (() => {
     );
   }
 
-  function targetTime(state, timeGrid, tile) {
+  function targetRouteCost(state, routeGrid, tile) {
     if (tile.isVisited && !samePosition(state.position, tile)) {
       return GameConstants.DUNGEON_TICK;
     }
-    return timeGrid.costs[tile.y][tile.x];
+    return routeGrid.costs[tile.y][tile.x];
   }
 
-  function findBestTarget(state, timeGrid, predicate) {
+  function findBestTarget(state, routeGrid, predicate) {
     let bestTarget;
-    let bestTime = Infinity;
+    let bestCost = Infinity;
 
     for (const tile of state.allTiles[state.position.floor]) {
       if (!predicate(tile)) {
         continue;
       }
 
-      const time = targetTime(state, timeGrid, tile);
-      if (time >= bestTime) {
+      const cost = targetRouteCost(state, routeGrid, tile);
+      if (cost >= bestCost) {
         continue;
       }
 
       bestTarget = tile;
-      bestTime = time;
+      bestCost = cost;
     }
 
     return bestTarget;
@@ -199,7 +199,7 @@ const dungeon = (() => {
     ]);
   }
 
-  function findChestThatCanRevealFloor(state, timeGrid) {
+  function findChestThatCanRevealFloor(state, routeGrid) {
     const { allTiles, board, chestsOpened, options, position } = state;
     const floor = position.floor;
     const tiles = allTiles[floor];
@@ -213,7 +213,7 @@ const dungeon = (() => {
       return;
     }
 
-    return findBestTarget(state, timeGrid, isEligible);
+    return findBestTarget(state, routeGrid, isEligible);
   }
 
   function moveAction(tile) {
@@ -343,7 +343,7 @@ const dungeon = (() => {
     const node = queue[index];
     while (index > 0) {
       const parentIndex = Math.floor((index - 1) / 2);
-      if (queue[parentIndex].time <= node.time) {
+      if (queue[parentIndex].cost <= node.cost) {
         break;
       }
 
@@ -364,11 +364,11 @@ const dungeon = (() => {
       let childIndex = leftIndex;
       const rightIndex = leftIndex + 1;
 
-      if (rightIndex < queue.length && queue[rightIndex].time < queue[leftIndex].time) {
+      if (rightIndex < queue.length && queue[rightIndex].cost < queue[leftIndex].cost) {
         childIndex = rightIndex;
       }
 
-      if (queue[childIndex].time >= node.time) {
+      if (queue[childIndex].cost >= node.cost) {
         break;
       }
 
@@ -378,12 +378,12 @@ const dungeon = (() => {
     queue[index] = node;
   }
 
-  function enqueueTimeNode(queue, x, y, time) {
-    queue.push({ x, y, time });
+  function enqueueRouteNode(queue, x, y, cost) {
+    queue.push({ x, y, cost });
     siftUp(queue, queue.length - 1);
   }
 
-  function dequeueTimeNode(queue) {
+  function dequeueRouteNode(queue) {
     const node = queue[0];
     const lastNode = queue.pop();
     if (queue.length > 0) {
@@ -393,7 +393,7 @@ const dungeon = (() => {
     return node;
   }
 
-  function createTimeGrid(state) {
+  function createRouteGrid(state) {
     const floorIndex = state.position.floor;
     const floor = state.board[floorIndex];
     const unseenBattleChance = unseenBattleProbability(state);
@@ -406,12 +406,12 @@ const dungeon = (() => {
         continue;
       }
       costs[tile.y][tile.x] = 0;
-      enqueueTimeNode(queue, tile.x, tile.y, 0);
+      enqueueRouteNode(queue, tile.x, tile.y, 0);
     }
 
     while (queue.length > 0) {
-      const node = dequeueTimeNode(queue);
-      if (node.time !== costs[node.y][node.x]) {
+      const node = dequeueRouteNode(queue);
+      if (node.cost !== costs[node.y][node.x]) {
         continue;
       }
 
@@ -421,24 +421,24 @@ const dungeon = (() => {
           continue;
         }
 
-        const candidateTime = node.time + routeCost(state, candidate, unseenBattleChance);
-        if (candidateTime >= costs[candidate.y][candidate.x]) {
+        const candidateCost = node.cost + routeCost(state, candidate, unseenBattleChance);
+        if (candidateCost >= costs[candidate.y][candidate.x]) {
           continue;
         }
 
-        costs[candidate.y][candidate.x] = candidateTime;
+        costs[candidate.y][candidate.x] = candidateCost;
         predecessors[candidate.y][candidate.x] = floor[node.y][node.x];
-        enqueueTimeNode(queue, candidate.x, candidate.y, candidateTime);
+        enqueueRouteNode(queue, candidate.x, candidate.y, candidateCost);
       }
     }
 
     return { costs, predecessors };
   }
 
-  function followTarget(state, timeGrid, target) {
+  function followTarget(state, routeGrid, target) {
     let tile = target;
     while (true) {
-      const predecessor = timeGrid.predecessors[tile.y][tile.x];
+      const predecessor = routeGrid.predecessors[tile.y][tile.x];
       if (predecessor.isVisited) {
         break;
       }
@@ -455,9 +455,9 @@ const dungeon = (() => {
   }
 
   function chooseDungeonAction(state) {
-    const { options, progression, position, timeGrid } = state;
+    const { options, progression, position, routeGrid } = state;
     if (state.timeLeft < GameConstants.BATTLE_TICK) {
-      const chest = findBestTarget(state, timeGrid, (tile) => _and([
+      const chest = findBestTarget(state, routeGrid, (tile) => _and([
         tile.type === GameConstants.DungeonTileType.chest,
         isAccessible(state, tile),
       ]));
@@ -470,12 +470,12 @@ const dungeon = (() => {
       // Try to reach unvisited, visible targets early to increase
       // visibility/reachability. Since we would have to eventually reach those
       // targets eventually, this should be mostly net positive.
-      const target = findBestTarget(state, timeGrid, (tile) => _and([
+      const target = findBestTarget(state, routeGrid, (tile) => _and([
         isTarget(state, tile),
         !isAccessible(state, tile),
       ]));
       if (target) {
-        return followTarget(state, timeGrid, target);
+        return followTarget(state, routeGrid, target);
       }
 
       const unvisitedNonBattleNeighbour = findUnvisitedNonBattleNeighbour(state);
@@ -488,10 +488,10 @@ const dungeon = (() => {
         // Open chests we would open before progressing anyway if they can
         // reveal remaining targets sooner. This might not always be strictly
         // positive, but I think should be preferable overall.
-        const revealChest = findChestThatCanRevealFloor(state, timeGrid);
+        const revealChest = findChestThatCanRevealFloor(state, routeGrid);
         if (revealChest) {
           if (!isAccessible(state, revealChest)) {
-            return followTarget(state, timeGrid, revealChest);
+            return followTarget(state, routeGrid, revealChest);
           }
           return moveToOrInteract(position, revealChest, Interaction.CHEST);
         }
@@ -502,29 +502,29 @@ const dungeon = (() => {
 
     if (!isAccessible(state, progression)) {
       // prioritize finding the progression tile first
-      return followTarget(state, timeGrid, progression);
+      return followTarget(state, routeGrid, progression);
     }
 
     if (options.fightAllBattles) {
-      const battle = findBestTarget(state, timeGrid, (tile) => tile.type === GameConstants.DungeonTileType.enemy);
+      const battle = findBestTarget(state, routeGrid, (tile) => tile.type === GameConstants.DungeonTileType.enemy);
       if (battle) {
-        return isAccessible(state, battle) ? moveAction(battle) : followTarget(state, timeGrid, battle);
+        return isAccessible(state, battle) ? moveAction(battle) : followTarget(state, routeGrid, battle);
       }
     }
 
     if (options.searchAllChests) {
       // make all known chests accessible before opening any of them
-      const inaccessibleChest = findBestTarget(state, timeGrid, (tile) => _and([
+      const inaccessibleChest = findBestTarget(state, routeGrid, (tile) => _and([
         tile.type === GameConstants.DungeonTileType.chest,
         !isAccessible(state, tile),
       ]));
       if (inaccessibleChest) {
-        return followTarget(state, timeGrid, inaccessibleChest);
+        return followTarget(state, routeGrid, inaccessibleChest);
       }
     }
 
     if (options.openAccessibleChests) {
-      const chest = findBestTarget(state, timeGrid, (tile) => _and([
+      const chest = findBestTarget(state, routeGrid, (tile) => _and([
         isAccessible(state, tile),
         isChestToOpen(tile, options.minimumChestTier),
       ]));
@@ -679,6 +679,6 @@ const dungeon = (() => {
     automate,
     chooseDungeonAction,
     completeDungeonMap,
-    createTimeGrid,
+    createRouteGrid,
   }
 })();

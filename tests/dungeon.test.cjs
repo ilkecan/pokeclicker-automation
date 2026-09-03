@@ -31,7 +31,7 @@ function loadDungeon(t) {
   return {
     ...loadedDungeon,
     chooseDungeonAction(state) {
-      state.timeGrid = loadedDungeon.createTimeGrid(state);
+      state.routeGrid = loadedDungeon.createRouteGrid(state);
       return loadedDungeon.chooseDungeonAction(state);
     },
   };
@@ -105,7 +105,7 @@ function createState({
     allTiles: [board.flat()],
     progression,
   };
-  state.timeGrid = dungeon.createTimeGrid(state);
+  state.routeGrid = dungeon.createRouteGrid(state);
   return state;
 }
 
@@ -140,7 +140,7 @@ test("exports the complete dungeon map entry point", () => {
 
 test("stores predecessors alongside route costs", () => {
   const state = createState({ targetType: null, visited: [[0, 0], [1, 0], [2, 0]] });
-  const { costs, predecessors } = state.timeGrid;
+  const { costs, predecessors } = state.routeGrid;
 
   assert.equal(costs[0][3], GameConstants.DUNGEON_TICK);
   assert.equal(predecessors[0][3], state.board[0][0][2]);
@@ -158,11 +158,11 @@ test("routes through a mandatory battle instead of a safe detour", () => {
   const battle = state.board[0][0][1];
   state.progression.type = DungeonTileType.boss;
   state.progression.isVisited = false;
-  state.timeGrid = dungeon.createTimeGrid(state);
+  state.routeGrid = dungeon.createRouteGrid(state);
 
-  assert.equal(state.timeGrid.costs[0][1], 0);
-  assert.equal(state.timeGrid.costs[1][1], 0);
-  assert.equal(state.timeGrid.predecessors[1][1], battle);
+  assert.equal(state.routeGrid.costs[0][1], 0);
+  assert.equal(state.routeGrid.costs[1][1], 0);
+  assert.equal(state.routeGrid.predecessors[1][1], battle);
   assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
 });
 
@@ -178,11 +178,11 @@ test("reconstructs adjacent zero-cost target chains", () => {
   const chest = state.board[0][0][1];
   chest.isVisible = true;
   chest.type = DungeonTileType.chest;
-  state.timeGrid = dungeon.createTimeGrid(state);
+  state.routeGrid = dungeon.createRouteGrid(state);
 
-  assert.equal(state.timeGrid.costs[0][1], 0);
-  assert.equal(state.timeGrid.costs[0][2], 0);
-  assert.equal(state.timeGrid.predecessors[0][2], chest);
+  assert.equal(state.routeGrid.costs[0][1], 0);
+  assert.equal(state.routeGrid.costs[0][2], 0);
+  assert.equal(state.routeGrid.predecessors[0][2], chest);
   assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
 });
 
