@@ -51,6 +51,15 @@ for (const size of [5, 10, 14]) {
 const opened = run(['--single', '--maps', '1', '--size', '10', '--open-accessible-chests', '--seed', '7']);
 assert.ok(opened.scenarios[0].maps[0].chestsOpened > 0);
 
+const noFlash = run(['--single', '--maps', '1', '--size', '5', '--seed', '42', '--dungeon-clears', '0']);
+const firstFlash = run(['--single', '--maps', '1', '--size', '5', '--seed', '42', '--dungeon-clears', '100']);
+assert.equal(noFlash.configuration.dungeonClears, 0);
+assert.equal(firstFlash.configuration.dungeonClears, 100);
+assert.ok(firstFlash.officialSource.modulesLoaded.includes('src/scripts/dungeons/DungeonFlash.ts'));
+assert.notEqual(noFlash.scenarios[0].maps[0].simulatedSeconds, firstFlash.scenarios[0].maps[0].simulatedSeconds);
+
+expectRejected(['--single', '--dungeon-clears', '-1'], /dungeonClears must be a non-negative integer/);
+
 const timedOut = run(['--single', '--maps', '1', '--size', '5', '--battle-ticks', '100', '--boss-ticks', '100', '--seed', '42']);
 assert.equal(timedOut.scenarios[0].totals.timedOut, 1);
 assert.equal(timedOut.scenarios[0].distributions.completionSeconds.count, 0);

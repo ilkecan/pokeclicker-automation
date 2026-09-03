@@ -26,6 +26,7 @@ const REQUIRED_GAME_FILES = [
 const DUNGEON_SCRIPTS = [
   'src/scripts/dungeons/Point.ts',
   'src/scripts/dungeons/DungeonTile.ts',
+  'src/scripts/dungeons/DungeonFlash.ts',
   'src/scripts/dungeons/DungeonMap.ts',
   'src/scripts/dungeons/DungeonRunner.ts',
 ];
@@ -72,6 +73,12 @@ function validatePositiveInteger(name, value) {
   }
 }
 
+function validateNonNegativeInteger(name, value) {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`[pokeclicker-automation] dungeon-runtime: ${name} must be a non-negative integer, got ${value}`);
+  }
+}
+
 function validateSize(size) {
   if (!Number.isInteger(size) || size < 5 || size > 14) {
     throw new Error(`[pokeclicker-automation] dungeon-runtime: size must be an integer from 5 to 14, got ${size}`);
@@ -87,6 +94,7 @@ function createRuntime(options = {}) {
   const gameDir = path.resolve(options.gameDir || process.env.POKECLICKER_DIR || defaultGameDir());
   const automationPath = path.resolve(options.automationPath || defaultAutomationPath());
   const seed = Number(options.seed ?? 1);
+  const dungeonClears = Number(options.dungeonClears ?? 0);
   const battleTicks = Number(options.battleTicks ?? 1);
   const bossTicks = Number(options.bossTicks ?? 1);
   const ko = require(path.join(gameDir, 'node_modules', 'knockout'));
@@ -325,6 +333,7 @@ function createRuntime(options = {}) {
   let currentSettings = {};
   try {
     validatePositiveInteger('battleTicks', battleTicks);
+    validateNonNegativeInteger('dungeonClears', dungeonClears);
     validatePositiveInteger('bossTicks', bossTicks);
     installEnvironment();
   } catch (error) {
@@ -377,13 +386,13 @@ function createRuntime(options = {}) {
   async function simulateMap(size, mapIndex, settings, chestTier, minimumChestTier, rootSeed) {
     const mapSeed = rootSeed + mapIndex * 2;
     officialRandom.seed(mapSeed);
+    const fixture = createFixture();
+    context.App.game.statistics.dungeonsCleared[GameConstants.getDungeonIndex(fixture.name)](dungeonClears);
     const map = new DungeonMap(size, () => ({
       tier: chestTier,
       loot: { loot: 'simulated loot', amount: 1, ignoreDebuff: false },
-    }));
+    }), DungeonRunner.getFlash(fixture.name));
     const initialHash = mapHash(map);
-    const fixture = createFixture();
-    context.App.game.statistics.dungeonsCleared[GameConstants.getDungeonIndex(fixture.name)](0);
     currentSettings = { ...settings, minimumChestTier };
     resetRunner(map, fixture);
     const startedVirtualTime = clock.now;
@@ -518,6 +527,7 @@ function createRuntime(options = {}) {
       return {
         configuration: {
           mode: single ? 'single' : 'matrix',
+          dungeonClears,
           seed,
           maps,
           sizes: single ? [size] : [...sizes],

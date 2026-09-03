@@ -14,6 +14,10 @@ just simulator dungeon test
 
 Matrix mode is the default. It runs the eight combinations of `fightAllBattles`, `openAccessibleChests`, and `searchAllChests` at sizes 5, 10, and 14, with 1000 maps per scenario. Use `--sizes` to select matrix sizes. Use `--single` with policy flags for one configuration; all policy booleans default to false in single mode.
 
+Use `--dungeon-clears N` to set the official dungeon clear count used by
+`DungeonRunner.getFlash`. The default is `0`; flash tiers activate at 100, 250,
+and 400 clears.
+
 ## Compare policies
 
 ```sh

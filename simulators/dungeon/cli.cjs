@@ -14,6 +14,7 @@ Runs src/dungeon.js against official PokéClicker dungeon map and runner code.
 Options:
   --maps N                  Maps per scenario (default: 1000)
   --seed N                  Deterministic random seed (default: 1)
+  --dungeon-clears N        Completed clears for official flash tier (default: 0)
   --sizes LIST              Matrix sizes (default: 5,10,14)
   --single                  Run one policy configuration instead of the matrix
   --size N                  Single-mode map size (default: 5)
@@ -56,6 +57,7 @@ function parseArgs(argv) {
   const options = {
     maps: 1000,
     seed: 1,
+    dungeonClears: 0,
     sizes: [5, 10, 14],
     single: false,
     size: 5,
@@ -80,6 +82,7 @@ function parseArgs(argv) {
     switch (argument) {
       case '--maps': options.maps = parsePositiveInteger(argument, next()); break;
       case '--seed': options.seed = parseInteger(argument, next()); break;
+      case '--dungeon-clears': options.dungeonClears = parseInteger(argument, next()); break;
       case '--sizes': options.sizes = parseSizes(next()); options.sizesSpecified = true; break;
       case '--single': options.single = true; break;
       case '--size': options.size = parseInteger(argument, next()); options.sizeSpecified = true; break;
