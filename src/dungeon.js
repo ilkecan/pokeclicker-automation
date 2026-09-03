@@ -689,6 +689,7 @@ const dungeon = (() => {
     ChestTier,
     automate,
     chooseDungeonAction,
+    completeDungeonMap,
     createTimeGrid,
   }
 })();

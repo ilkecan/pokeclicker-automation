@@ -1,3 +1,4 @@
+mod dungeon 'simulator/dungeon.just'
 mod underground 'simulator/underground.just'
 
 [private]

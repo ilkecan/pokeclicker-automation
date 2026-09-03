@@ -14,4 +14,14 @@ just simulator underground compare baseline.js candidate.js --mines 2000 --seed 
 just simulator underground test
 ```
 
+The [Dungeon simulator](dungeon/) runs and compares dungeon policies across paired official maps:
+
+```sh
+just simulator dungeon run --seed 42
+just simulator dungeon compare baseline.js candidate.js --maps 2000 --seed 42
+just simulator dungeon test
+```
+
+Both simulators report reproducible virtual outcomes, distribution statistics, policy timing, and official-source provenance.
+
 Run these commands inside the repository's devenv environment.

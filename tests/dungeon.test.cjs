@@ -134,6 +134,10 @@ test("uses the fixed chest tier ordering before game initialization", () => {
   assert.deepEqual(Object.values(dungeon.ChestTier), [0, 1, 2, 3, 4]);
 });
 
+test("exports the complete dungeon map entry point", () => {
+  assert.equal(typeof dungeon.completeDungeonMap, "function");
+});
+
 test("moves toward an inaccessible battle during target discovery", (t) => {
   const state = createState({
     targetType: "enemy",
