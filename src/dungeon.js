@@ -435,7 +435,7 @@ const dungeon = (() => {
     return { costs, predecessors };
   }
 
-  function followTarget(state, routeGrid, target) {
+  function followTarget(routeGrid, target) {
     let tile = target;
     while (true) {
       const predecessor = routeGrid.predecessors[tile.y][tile.x];
@@ -474,7 +474,7 @@ const dungeon = (() => {
       !isAccessible(state, tile),
     ]));
     if (target) {
-      return followTarget(state, routeGrid, target);
+      return followTarget(routeGrid, target);
     }
 
     if (!allTargetsVisible(state)) {
@@ -491,7 +491,7 @@ const dungeon = (() => {
         const revealChest = findChestThatCanRevealFloor(state, routeGrid);
         if (revealChest) {
           if (!isAccessible(state, revealChest)) {
-            return followTarget(state, routeGrid, revealChest);
+            return followTarget(routeGrid, revealChest);
           }
           return moveToOrInteract(position, revealChest, Interaction.CHEST);
         }
@@ -502,13 +502,13 @@ const dungeon = (() => {
 
     if (!isAccessible(state, progression)) {
       // prioritize finding the progression tile first
-      return followTarget(state, routeGrid, progression);
+      return followTarget(routeGrid, progression);
     }
 
     if (options.fightAllBattles) {
       const battle = findBestTarget(state, routeGrid, (tile) => tile.type === GameConstants.DungeonTileType.enemy);
       if (battle) {
-        return isAccessible(state, battle) ? moveAction(battle) : followTarget(state, routeGrid, battle);
+        return isAccessible(state, battle) ? moveAction(battle) : followTarget(routeGrid, battle);
       }
     }
 
