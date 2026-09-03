@@ -146,6 +146,46 @@ test("stores predecessors alongside route costs", () => {
   assert.equal(predecessors[0][3], state.board[0][0][2]);
 });
 
+test("routes through a mandatory battle instead of a safe detour", () => {
+  const state = createState({
+    targetType: "enemy",
+    targetPosition: [1, 0],
+    options: { fightAllBattles: true },
+    targetCounts: { chests: 0, battles: 1 },
+    visited: [[0, 0]],
+    progressionPosition: [1, 1],
+  });
+  const battle = state.board[0][0][1];
+  state.progression.type = DungeonTileType.boss;
+  state.progression.isVisited = false;
+  state.timeGrid = dungeon.createTimeGrid(state);
+
+  assert.equal(state.timeGrid.costs[0][1], 0);
+  assert.equal(state.timeGrid.costs[1][1], 0);
+  assert.equal(state.timeGrid.predecessors[1][1], battle);
+  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+});
+
+test("reconstructs adjacent zero-cost target chains", () => {
+  const state = createState({
+    targetType: "enemy",
+    targetPosition: [2, 0],
+    options: { fightAllBattles: true, searchAllChests: true },
+    targetCounts: { chests: 1, battles: 1 },
+    visited: [[0, 0]],
+    progressionPosition: [4, 0],
+  });
+  const chest = state.board[0][0][1];
+  chest.isVisible = true;
+  chest.type = DungeonTileType.chest;
+  state.timeGrid = dungeon.createTimeGrid(state);
+
+  assert.equal(state.timeGrid.costs[0][1], 0);
+  assert.equal(state.timeGrid.costs[0][2], 0);
+  assert.equal(state.timeGrid.predecessors[0][2], chest);
+  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+});
+
 test("leaves unreachable targets unselected", () => {
   const state = createState({
     targetType: "enemy",
@@ -571,7 +611,7 @@ test("does not explore non-battle neighbours when every target is visible", (t) 
   assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
 });
 
-test("prefers a battle-free shortest path to visible progression", (t) => {
+test("routes through a mandatory battle to visible progression", (t) => {
   const state = createState({
     targetType: null,
     options: { fightAllBattles: true },
@@ -588,10 +628,10 @@ test("prefers a battle-free shortest path to visible progression", (t) => {
   emptyPathTile.isVisible = true;
   emptyPathTile.type = DungeonTileType.empty;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
+  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
 });
 
-test("prefers a longer battle-free path over a shorter fighting path", (t) => {
+test("routes through a mandatory battle on a shorter path", (t) => {
   const state = createState({
     targetType: null,
     options: { fightAllBattles: true },
@@ -610,7 +650,7 @@ test("prefers a longer battle-free path over a shorter fighting path", (t) => {
     emptyPathTile.type = DungeonTileType.empty;
   }
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
+  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
 });
 
 test("keeps normal exploration when no target is available", (t) => {
