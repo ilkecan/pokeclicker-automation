@@ -466,18 +466,18 @@ const dungeon = (() => {
       }
     }
 
-    if (!allTargetsVisible(state)) {
-      // Try to reach unvisited, visible targets early to increase
-      // visibility/reachability. Since we would have to eventually reach those
-      // targets eventually, this should be mostly net positive.
-      const target = findBestTarget(state, routeGrid, (tile) => _and([
-        isTarget(state, tile),
-        !isAccessible(state, tile),
-      ]));
-      if (target) {
-        return followTarget(state, routeGrid, target);
-      }
+    // Try to reach unvisited, visible targets early to increase visibility /
+    // reachability. Since we would have to eventually reach those targets
+    // eventually, this should be mostly net positive.
+    const target = findBestTarget(state, routeGrid, (tile) => _and([
+      isTarget(state, tile),
+      !isAccessible(state, tile),
+    ]));
+    if (target) {
+      return followTarget(state, routeGrid, target);
+    }
 
+    if (!allTargetsVisible(state)) {
       const unvisitedNonBattleNeighbour = findUnvisitedNonBattleNeighbour(state);
       if (unvisitedNonBattleNeighbour) {
         // visiting unexplored accessible non-battle tiles increase future accessibility
