@@ -100,7 +100,8 @@ function printReport(report, perMine) {
   console.log(`[pokeclicker-automation] underground-cli: Automation: ${automationSource.path}`);
   console.log(`[pokeclicker-automation] underground-cli: Completed: ${totals.itemsFound}/${totals.itemsBuried} items in ${totals.ticks} ticks`);
   console.log(`[pokeclicker-automation] underground-cli: Virtual time: ${totals.simulatedSeconds.toFixed(3)} seconds (${totals.discoverySeconds.toFixed(3)} discovering mines)`);
-  console.log(`[pokeclicker-automation] underground-cli: Average: ${averages.ticksPerMine.toFixed(3)} ticks/mine, ${averages.layersRemovedPerMine.toFixed(3)} layers/mine`);
+  console.log(`[pokeclicker-automation] underground-cli: Average: ${averages.ticksPerMine.toFixed(3)} ticks/mine, ${averages.simulatedSecondsPerMine.toFixed(3)} seconds/mine, ${averages.layersRemovedPerMine.toFixed(3)} layers/mine, ${averages.itemsPerMine.toFixed(3)} items/mine`);
+  console.log(`[pokeclicker-automation] underground-cli: Distributions: ticks median=${report.distributions.ticksPerMine.median.toFixed(3)}, p95=${report.distributions.ticksPerMine.p95.toFixed(3)}; time median=${report.distributions.simulatedSecondsPerMine.median.toFixed(3)}s, p95=${report.distributions.simulatedSecondsPerMine.p95.toFixed(3)}s; layers median=${report.distributions.layersRemovedPerMine.median.toFixed(3)}, p95=${report.distributions.layersRemovedPerMine.p95.toFixed(3)}; items median=${report.distributions.itemsPerMine.median.toFixed(3)}, p95=${report.distributions.itemsPerMine.p95.toFixed(3)}`);
   console.log(`[pokeclicker-automation] underground-cli: Rewards: gained=${totals.itemsGained}, destroyed=${totals.itemsDestroyed}`);
   console.log(`[pokeclicker-automation] underground-cli: Tools: ${formatCounter(totals.toolsUsed, toolNames)}`);
   console.log(`[pokeclicker-automation] underground-cli: Battery: ${formatCounter(totals.batteryDischarges)}`);

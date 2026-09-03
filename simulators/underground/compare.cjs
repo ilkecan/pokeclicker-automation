@@ -5,6 +5,15 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { summarizeSample } = require('../lib/statistics.cjs');
+
+function formatDistribution(distribution) {
+  return `mean=${distribution.mean.toFixed(3)}, median=${distribution.median.toFixed(3)}, p95=${distribution.p95.toFixed(3)}`;
+}
+
+function pairedDistribution(baseline, candidate, field) {
+  return summarizeSample(candidate.map((item, index) => item[field] - baseline[index][field]));
+}
 
 const cli = path.join(__dirname, 'cli.cjs');
 const REPORT_FILE_ENV = 'POKECLICKER_UNDERGROUND_REPORT_FILE';
@@ -113,6 +122,18 @@ function main() {
     automationTime: ratio(candidate.performance.automationElapsedMs, baseline.performance.automationElapsedMs),
     wallTime: ratio(candidate.performance.elapsedMs, baseline.performance.elapsedMs),
   };
+  const distributionFields = [
+    ['ticks', 'ticks'],
+    ['simulated seconds', 'simulatedSeconds'],
+    ['layers removed', 'layersRemoved'],
+    ['items found', 'itemsFound'],
+  ];
+  for (const [label, field] of distributionFields) {
+    const baselineDistribution = summarizeSample(baseline.mines.map((mine) => mine[field]));
+    const candidateDistribution = summarizeSample(candidate.mines.map((mine) => mine[field]));
+    const paired = pairedDistribution(baseline.mines, candidate.mines, field);
+    console.log(`[pokeclicker-automation] compare: ${label}: baseline ${formatDistribution(baselineDistribution)}; candidate ${formatDistribution(candidateDistribution)}; paired candidate-baseline ${formatDistribution(paired)}`);
+  }
 
   console.log(`[pokeclicker-automation] compare: Baseline:  ${baseline.automationSource.path}`);
   console.log(`[pokeclicker-automation] compare: Candidate: ${candidate.automationSource.path}`);
