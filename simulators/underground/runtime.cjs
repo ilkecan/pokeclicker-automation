@@ -15,6 +15,7 @@ const {
   resolveGameDir,
   sha256,
 } = require('../../lib/runtime.cjs');
+const { summarizeSample } = require('../lib/statistics.cjs');
 const { createVirtualClock } = require('../lib/virtual-clock.cjs');
 
 const REQUIRED_GAME_FILES = [
@@ -565,8 +566,15 @@ function createRuntime(options = {}) {
           totals,
           averages: {
             ticksPerMine: totals.ticks / mines,
+            simulatedSecondsPerMine: totals.simulatedSeconds / mines,
             layersRemovedPerMine: totals.layersRemoved / mines,
             itemsPerMine: totals.itemsFound / mines,
+          },
+          distributions: {
+            ticksPerMine: summarizeSample(results.map((mine) => mine.ticks)),
+            simulatedSecondsPerMine: summarizeSample(results.map((mine) => mine.simulatedSeconds)),
+            layersRemovedPerMine: summarizeSample(results.map((mine) => mine.layersRemoved)),
+            itemsPerMine: summarizeSample(results.map((mine) => mine.itemsFound)),
           },
           performance: {
             elapsedMs,

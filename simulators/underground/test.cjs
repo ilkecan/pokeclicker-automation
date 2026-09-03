@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 const { createVirtualClock } = require('../lib/virtual-clock.cjs');
+const { summarizeSample } = require('../lib/statistics.cjs');
 const { createRuntime, defaultGameDir } = require('./runtime.cjs');
 
 const cli = path.join(__dirname, 'cli.cjs');
@@ -49,6 +50,7 @@ function testSuccessfulComparison() {
   assert.match(result.stdout, /Boards: identical official generation in both runs/);
   assert.match(result.stdout, /Policy setup:/);
   assert.match(result.stdout, /Policy actions:/);
+  assert.match(result.stdout, /paired candidate-baseline mean=0\.000/);
 }
 
 async function testVirtualClock() {
@@ -116,9 +118,15 @@ async function testRuntimeLifecycle() {
 const first = run(314159);
 const second = run(314159);
 
+assert.deepEqual(summarizeSample([]), { count: 0, mean: null, median: null, p95: null });
+assert.deepEqual(summarizeSample([5, 1, 3]), { count: 3, mean: 3, median: 3, p95: 5 });
+assert.deepEqual(summarizeSample([4, 1, 3, 2]), { count: 4, mean: 2.5, median: 2.5, p95: 4 });
+assert.deepEqual(summarizeSample(Array.from({ length: 20 }, (_, index) => index + 1)).p95, 19);
+assert.throws(() => summarizeSample([1, Infinity]), /finite numbers/);
 assert.deepEqual(first.configuration, second.configuration);
 assert.deepEqual(first.totals, second.totals);
 assert.deepEqual(first.averages, second.averages);
+assert.deepEqual(first.distributions, second.distributions);
 assert.deepEqual(first.mines, second.mines);
 assert.equal(first.totals.itemsFound, first.totals.itemsBuried);
 assert.equal(first.mines.length, 4);
