@@ -147,7 +147,7 @@ const dungeon = (() => {
     if (tile.isVisited && !samePosition(state.position, tile)) {
       return GameConstants.DUNGEON_TICK;
     }
-    return timeGrid[tile.y][tile.x];
+    return timeGrid.costs[tile.y][tile.x];
   }
 
   function findBestTarget(state, timeGrid, predicate) {
@@ -389,20 +389,21 @@ const dungeon = (() => {
     const floorIndex = state.position.floor;
     const floor = state.board[floorIndex];
     const unseenBattleChance = unseenBattleProbability(state);
-    const timeGrid = Array.from({ length: floor.length }, () => Array(floor.length).fill(Infinity));
+    const costs = Array.from({ length: floor.length }, () => Array(floor.length).fill(Infinity));
+    const predecessors = Array.from({ length: floor.length }, () => Array(floor.length).fill(null));
     const queue = [];
 
     for (const tile of state.allTiles[floorIndex]) {
       if (!tile.isVisited) {
         continue;
       }
-      timeGrid[tile.y][tile.x] = 0;
+      costs[tile.y][tile.x] = 0;
       enqueueTimeNode(queue, tile.x, tile.y, 0);
     }
 
     while (queue.length > 0) {
       const node = dequeueTimeNode(queue);
-      if (node.time !== timeGrid[node.y][node.x]) {
+      if (node.time !== costs[node.y][node.x]) {
         continue;
       }
 
@@ -413,43 +414,23 @@ const dungeon = (() => {
         }
 
         const candidateTime = node.time + frontierTime(candidate, unseenBattleChance);
-        if (candidateTime >= timeGrid[candidate.y][candidate.x]) {
+        if (candidateTime >= costs[candidate.y][candidate.x]) {
           continue;
         }
 
-        timeGrid[candidate.y][candidate.x] = candidateTime;
+        costs[candidate.y][candidate.x] = candidateTime;
+        predecessors[candidate.y][candidate.x] = floor[node.y][node.x];
         enqueueTimeNode(queue, candidate.x, candidate.y, candidateTime);
       }
     }
 
-    return timeGrid;
-  }
-
-  function findPathPredecessor(state, timeGrid, tile) {
-    const floor = state.board[tile.floor];
-    let predecessor;
-    let predecessorTime = timeGrid[tile.y][tile.x];
-    for (const direction of DIRECTIONS) {
-      const candidate = floor[tile.y + direction.y]?.[tile.x + direction.x];
-      if (!candidate) {
-        continue;
-      }
-
-      const candidateTime = timeGrid[candidate.y][candidate.x];
-      if (candidateTime >= predecessorTime) {
-        continue;
-      }
-
-      predecessor = candidate;
-      predecessorTime = candidateTime;
-    }
-    return predecessor;
+    return { costs, predecessors };
   }
 
   function followTarget(state, timeGrid, target) {
     let tile = target;
     while (true) {
-      const predecessor = findPathPredecessor(state, timeGrid, tile);
+      const predecessor = timeGrid.predecessors[tile.y][tile.x];
       if (predecessor.isVisited) {
         break;
       }

@@ -138,6 +138,26 @@ test("exports the complete dungeon map entry point", () => {
   assert.equal(typeof dungeon.completeDungeonMap, "function");
 });
 
+test("stores predecessors alongside route costs", () => {
+  const state = createState({ targetType: null, visited: [[0, 0], [1, 0], [2, 0]] });
+  const { costs, predecessors } = state.timeGrid;
+
+  assert.equal(costs[0][3], GameConstants.DUNGEON_TICK);
+  assert.equal(predecessors[0][3], state.board[0][0][2]);
+});
+
+test("leaves unreachable targets unselected", () => {
+  const state = createState({
+    targetType: "enemy",
+    options: { fightAllBattles: true },
+  });
+  state.board[0][3][4] = null;
+  state.board[0][4][3] = null;
+
+  const action = dungeon.chooseDungeonAction(state);
+  assert.equal(action.type, "move");
+});
+
 test("moves toward an inaccessible battle during target discovery", (t) => {
   const state = createState({
     targetType: "enemy",
@@ -145,7 +165,7 @@ test("moves toward an inaccessible battle during target discovery", (t) => {
     targetCounts: { chests: 0, battles: 2 },
   });
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 3, y: 0 });
+  assertMove(dungeon.chooseDungeonAction(state), { x: 2, y: 1 });
 });
 
 test("finds an inaccessible battle beyond an accessible battle", (t) => {
