@@ -512,17 +512,6 @@ const dungeon = (() => {
       }
     }
 
-    if (options.searchAllChests) {
-      // make all known chests accessible before opening any of them
-      const inaccessibleChest = findBestTarget(state, routeGrid, (tile) => _and([
-        tile.type === GameConstants.DungeonTileType.chest,
-        !isAccessible(state, tile),
-      ]));
-      if (inaccessibleChest) {
-        return followTarget(state, routeGrid, inaccessibleChest);
-      }
-    }
-
     if (options.openAccessibleChests) {
       const chest = findBestTarget(state, routeGrid, (tile) => _and([
         isAccessible(state, tile),
