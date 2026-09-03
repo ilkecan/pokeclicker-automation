@@ -27,7 +27,14 @@ function createDungeonGlobals() {
 }
 
 function loadDungeon(t) {
-  return createHarness(t).loadAutomation("dungeon", createDungeonGlobals()).automation;
+  const loadedDungeon = createHarness(t).loadAutomation("dungeon", createDungeonGlobals()).automation;
+  return {
+    ...loadedDungeon,
+    chooseDungeonAction(state) {
+      state.timeGrid = loadedDungeon.createTimeGrid(state);
+      return loadedDungeon.chooseDungeonAction(state);
+    },
+  };
 }
 
 function createState({
@@ -82,7 +89,7 @@ function createState({
     progression = target;
   }
 
-  return {
+  const state = {
     position: { x: 0, y: 0, floor: 0 },
     options: {
       searchAllChests: false,
@@ -98,6 +105,8 @@ function createState({
     allTiles: [board.flat()],
     progression,
   };
+  state.timeGrid = dungeon.createTimeGrid(state);
+  return state;
 }
 
 function assertMove(action, coordinates) {
@@ -148,6 +157,38 @@ test("finds an inaccessible battle beyond an accessible battle", (t) => {
 
   assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
 });
+
+test("chooses the inaccessible battle with the shortest time path", (t) => {
+  const state = createState({
+    targetType: "enemy",
+    targetPosition: [0, 1],
+    options: { fightAllBattles: true },
+    targetCounts: { chests: 0, battles: 2 },
+    progressionPosition: [4, 0],
+    visited: [[2, 0], [3, 0], [4, 0]],
+  });
+  state.position = { x: 4, y: 0, floor: 0 };
+
+  const closerBattle = state.board[0][2][4];
+  closerBattle.isVisible = true;
+  closerBattle.type = DungeonTileType.enemy;
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 1 });
+});
+
+test("uses every visited tile as a zero-cost route source", (t) => {
+  const state = createState({
+    targetType: null,
+    options: { openAccessibleChests: false },
+    progressionPosition: [2, 0],
+    visited: [[0, 0], [0, 1]],
+  });
+  state.position = { x: 0, y: 1, floor: 0 };
+  state.progression.isVisited = false;
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+});
+
 
 test("finds an inaccessible chest beyond an accessible chest", (t) => {
   const state = createState({
@@ -321,6 +362,29 @@ test("does not salvage chests at the battle tick boundary", (t) => {
   assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 0 });
 });
 
+test("salvages the current chest before remote accessible chests", (t) => {
+  const state = createState({
+    targetType: null,
+    options: { openAccessibleChests: false, minimumChestTier: "mythic" },
+    targetCounts: { chests: 2, battles: 0 },
+    progressionPosition: [4, 0],
+    visited: [[0, 0], [4, 4]],
+  });
+  state.timeLeft = GameConstants.BATTLE_TICK - 1;
+  state.position = { x: 4, y: 4, floor: 0 };
+
+  const remoteChest = state.board[0][0][0];
+  remoteChest.isVisible = true;
+  remoteChest.type = DungeonTileType.chest;
+  remoteChest.chestTier = "common";
+  const currentChest = state.board[0][4][4];
+  currentChest.isVisible = true;
+  currentChest.type = DungeonTileType.chest;
+  currentChest.chestTier = "common";
+
+  assertInteract(dungeon.chooseDungeonAction(state), "chest");
+});
+
 test("skips accessible common chests", (t) => {
   const state = createState({
     targetType: "chest",
@@ -481,6 +545,48 @@ test("does not explore non-battle neighbours when every target is visible", (t) 
   emptyTile.type = DungeonTileType.empty;
 
   assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+});
+
+test("prefers a battle-free shortest path to visible progression", (t) => {
+  const state = createState({
+    targetType: null,
+    options: { fightAllBattles: true },
+    targetCounts: { chests: 0, battles: 1 },
+    progressionPosition: [1, 1],
+    visited: [[0, 0]],
+  });
+  state.progression.isVisited = false;
+
+  const battlePathTile = state.board[0][0][1];
+  battlePathTile.isVisible = true;
+  battlePathTile.type = DungeonTileType.enemy;
+  const emptyPathTile = state.board[0][1][0];
+  emptyPathTile.isVisible = true;
+  emptyPathTile.type = DungeonTileType.empty;
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
+});
+
+test("prefers a longer battle-free path over a shorter fighting path", (t) => {
+  const state = createState({
+    targetType: null,
+    options: { fightAllBattles: true },
+    targetCounts: { chests: 0, battles: 1 },
+    progressionPosition: [4, 0],
+    visited: [[0, 0]],
+  });
+  state.progression.isVisited = false;
+
+  const battlePathTile = state.board[0][0][1];
+  battlePathTile.isVisible = true;
+  battlePathTile.type = DungeonTileType.enemy;
+  for (const [x, y] of [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1]]) {
+    const emptyPathTile = state.board[0][y][x];
+    emptyPathTile.isVisible = true;
+    emptyPathTile.type = DungeonTileType.empty;
+  }
+
+  assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
 });
 
 test("keeps normal exploration when no target is available", (t) => {
