@@ -184,6 +184,14 @@ const dungeon = (() => {
     }
   }
 
+  function routeCost(state, tile, unseenBattleChance) {
+    if (isTarget(state, tile)) {
+      return 0;
+    }
+
+    return frontierTime(tile, unseenBattleChance);
+  }
+
   function isChestToOpen(tile, minimumChestTier) {
     return _and([
       tile.type === GameConstants.DungeonTileType.chest,
@@ -413,7 +421,7 @@ const dungeon = (() => {
           continue;
         }
 
-        const candidateTime = node.time + frontierTime(candidate, unseenBattleChance);
+        const candidateTime = node.time + routeCost(state, candidate, unseenBattleChance);
         if (candidateTime >= costs[candidate.y][candidate.x]) {
           continue;
         }
