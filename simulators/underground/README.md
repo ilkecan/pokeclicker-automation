@@ -7,22 +7,22 @@ This simulator runs `src/underground.js` against the official PokéClicker minin
 The official checkout must have its npm dependencies installed. Select it with `POKECLICKER_DIR` or `--game-dir PATH`.
 
 ```sh
-just simulator underground run --mines 1000 --seed 42 --level 30
-just simulator underground run --mines 100 --seed 42 --level 30 --json
+just simulator underground run --seed 42
+just simulator underground run --single --mines 100 --seed 42 --level 30 --mine-type Fossil --pretty
 just simulator underground test
 ```
 
-Use `just simulator underground run --help` for all options.
+Successful commands emit minified JSON by default; `--pretty` indents it. `--per-mine` adds individual mine results. Matrix mode runs seven mine types at levels 0, 10, 20, 30, 40, and 50: 42 configurations with 25 mines per configuration by default. Use `--mine-types` and `--levels` to select matrix dimensions. Use `--single` with `--mine-type` and `--level` for one configuration.
 
 ## Compare policies
 
 Both files must export `underground.dig`:
 
 ```sh
-just simulator underground compare baseline.js candidate.js --mines 2000 --seed 42 --level 30
+just simulator underground compare baseline.js candidate.js --single --mines 2000 --seed 42 --level 30 --mine-type Fossil
 ```
 
-The comparison gives both policies the same generated board for each mine. Generation and policy randomness use separate seeded streams so different policy decisions do not change later boards. For this reason, comparison mode rejects `--shared-rng`.
+The comparison gives both policies the same generated board for each mine and configuration. It emits one overall aggregate plus per-configuration distributions, paired deltas, and candidate/baseline ratios. `--per-mine` includes paired mine results. Generation and policy randomness use separate seeded streams so different policy decisions do not change later boards. Comparison mode rejects `--shared-rng`.
 
 Use a large mine count to reduce timing noise. The report separates policy setup, policy actions, combined policy time and total simulator runtime. Action time per tick helps distinguish callback cost from policies that take different numbers of ticks.
 

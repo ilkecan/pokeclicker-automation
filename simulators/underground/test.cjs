@@ -13,7 +13,7 @@ const compare = path.join(__dirname, 'compare.cjs');
 const automation = path.resolve(__dirname, '..', '..', 'src', 'underground.js');
 
 function run(seed, extra = []) {
-  const result = spawnSync(process.execPath, [cli, '--json', '--mines', '4', '--seed', String(seed), ...extra], {
+  const result = spawnSync(process.execPath, [cli, '--single', '--per-mine', '--mines', '4', '--seed', String(seed), ...extra], {
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -44,13 +44,14 @@ function testSuccessfulComparison() {
     '--candidate', automation,
     '--mines', '1',
     '--seed', '42',
+    '--single',
     '--no-battery',
   ], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /Boards: identical official generation in both runs/);
-  assert.match(result.stdout, /Policy setup:/);
-  assert.match(result.stdout, /Policy actions:/);
-  assert.match(result.stdout, /paired candidate-baseline mean=0\.000/);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.kind, 'comparison');
+  assert.equal(report.configurations.length, 1);
+  assert.equal(report.overall.pairedDelta.itemsPerMine.mean, 0);
 }
 
 async function testVirtualClock() {
@@ -117,6 +118,8 @@ async function testRuntimeLifecycle() {
 
 const first = run(314159);
 const second = run(314159);
+const firstConfig = first.configurations[0];
+const secondConfig = second.configurations[0];
 
 assert.deepEqual(summarizeSample([]), { count: 0, mean: null, median: null, p95: null });
 assert.deepEqual(summarizeSample([5, 1, 3]), { count: 3, mean: 3, median: 3, p95: 5 });
@@ -124,16 +127,32 @@ assert.deepEqual(summarizeSample([4, 1, 3, 2]), { count: 4, mean: 2.5, median: 2
 assert.deepEqual(summarizeSample(Array.from({ length: 20 }, (_, index) => index + 1)).p95, 19);
 assert.throws(() => summarizeSample([1, Infinity]), /finite numbers/);
 assert.deepEqual(first.configuration, second.configuration);
-assert.deepEqual(first.totals, second.totals);
-assert.deepEqual(first.averages, second.averages);
-assert.deepEqual(first.distributions, second.distributions);
-assert.deepEqual(first.mines, second.mines);
-assert.equal(first.totals.itemsFound, first.totals.itemsBuried);
-assert.equal(first.mines.length, 4);
+assert.deepEqual(first.overall, second.overall);
+assert.deepEqual(firstConfig, secondConfig);
+assert.equal(firstConfig.totals.itemsFound, firstConfig.totals.itemsBuried);
+assert.equal(firstConfig.mines.length, 4);
 assert.equal(first.configuration.pairedBoards, true);
-assert.ok(first.mines.every((mine) => /^[0-9a-f]{64}$/.test(mine.boardHash)));
-assert.ok(first.totals.ticks > 0);
-assert.ok(first.totals.layersRemoved > 0);
+assert.ok(firstConfig.mines.every((mine) => /^[0-9a-f]{64}$/.test(mine.boardHash)));
+const matrixResult = spawnSync(process.execPath, [
+  cli, '--per-mine', '--mines', '1', '--mine-types', 'Random,Special', '--levels', '0,50', '--seed', '42',
+], { encoding: 'utf8' });
+assert.equal(matrixResult.status, 0, matrixResult.stderr || matrixResult.stdout);
+const matrixReport = JSON.parse(matrixResult.stdout);
+assert.equal(matrixReport.configurations.length, 4);
+assert.equal(matrixReport.overall.totals.mines, 4);
+assert.equal(new Set(matrixReport.configurations.map((configuration) => configuration.configurationSeed)).size, 4);
+
+const canonicalSingle = run(42, ['--mine-type', 'Fossil', '--level', '30']);
+const canonicalMatrixResult = spawnSync(process.execPath, [
+  cli, '--per-mine', '--mines', '4', '--mine-types', 'Fossil', '--levels', '30', '--seed', '42',
+], { encoding: 'utf8' });
+assert.equal(canonicalMatrixResult.status, 0, canonicalMatrixResult.stderr || canonicalMatrixResult.stdout);
+const canonicalMatrix = JSON.parse(canonicalMatrixResult.stdout);
+assert.equal(canonicalSingle.configurations[0].configurationSeed, canonicalMatrix.configurations[0].configurationSeed);
+assert.deepEqual(canonicalSingle.configurations[0].mines, canonicalMatrix.configurations[0].mines);
+
+assert.ok(firstConfig.totals.ticks > 0);
+assert.ok(firstConfig.totals.layersRemoved > 0);
 assert.ok(first.performance.automationElapsedMs > 0);
 assert.ok(first.performance.automationSetupElapsedMs > 0);
 assert.ok(first.performance.automationSetupMicrosecondsPerMine > 0);
@@ -162,21 +181,20 @@ for (const required of [
 }
 
 const noBattery = run(271828, ['--trace-timing', '--no-battery', '--mine-type', 'Fossil', '--level', '0']);
+const noBatteryConfig = noBattery.configurations[0];
 assert.equal(noBattery.configuration.battery, false);
-assert.equal(noBattery.totals.itemsFound, noBattery.totals.itemsBuried);
-assert.deepEqual(noBattery.totals.batteryDischarges, {});
-assert.ok(noBattery.mines.every((mine) => mine.discoverySeconds === 900));
-assert.equal(
-  noBattery.totals.discoverySeconds,
-  noBattery.mines.reduce((total, mine) => total + mine.discoverySeconds, 0),
-);
-assert.ok(noBattery.mines.slice(1).some((mine) => Object.keys(mine.timingTrace.toolDurabilityBeforeDiscovery)
+assert.equal(noBatteryConfig.totals.itemsFound, noBatteryConfig.totals.itemsBuried);
+assert.deepEqual(noBatteryConfig.totals.batteryDischarges, {});
+assert.ok(noBatteryConfig.mines.every((mine) => mine.discoverySeconds === 900));
+assert.equal(noBatteryConfig.totals.discoverySeconds, noBatteryConfig.mines.reduce((total, mine) => total + mine.discoverySeconds, 0));
+assert.ok(noBatteryConfig.mines.slice(1).some((mine) => Object.keys(mine.timingTrace.toolDurabilityBeforeDiscovery)
   .some((tool) => mine.timingTrace.toolDurabilityBeforeDiscovery[tool] < 1 &&
     mine.timingTrace.toolDurabilityAfterDiscovery[tool] === 1)));
 
 const timedBattery = run(314159, ['--trace-timing', '--mine-type', 'Fossil', '--level', '30']);
-assert.ok(timedBattery.mines.every((mine) => mine.discoverySeconds === 600));
-const dischargeTraces = timedBattery.mines.flatMap((mine) => mine.timingTrace.batteryDischarges);
+const timedBatteryConfig = timedBattery.configurations[0];
+assert.ok(timedBatteryConfig.mines.every((mine) => mine.discoverySeconds === 600));
+const dischargeTraces = timedBatteryConfig.mines.flatMap((mine) => mine.timingTrace.batteryDischarges);
 const chargedFirstFrames = dischargeTraces.filter((trace) => trace.chargesAfterFirstFrame > 0);
 assert.ok(chargedFirstFrames.length > 0);
 assert.ok(chargedFirstFrames.every((trace) => trace.cooldownAfterFirstFrame === 1));
@@ -186,8 +204,7 @@ assert.ok(dischargeTraces.some((trace) =>
 
 const sharedRandom = run(161803, ['--shared-rng', '--no-battery']);
 assert.equal(sharedRandom.configuration.pairedBoards, false);
-assert.equal(sharedRandom.totals.itemsFound, sharedRandom.totals.itemsBuried);
-
+assert.equal(sharedRandom.configurations[0].totals.itemsFound, sharedRandom.configurations[0].totals.itemsBuried);
 expectComparisonRejection(['--automation', automation], /--automation is controlled/);
 expectComparisonRejection(['--baseline', automation], /--baseline may only be specified once/);
 expectComparisonRejection(['--candidate', automation], /--candidate may only be specified once/);

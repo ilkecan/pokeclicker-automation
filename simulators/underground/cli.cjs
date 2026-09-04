@@ -1,32 +1,42 @@
 #!/usr/bin/env node
 'use strict';
 
+const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { createRuntime, defaultAutomationPath, defaultGameDir } = require('./runtime.cjs');
+const { summarizeSample } = require('../lib/statistics.cjs');
+const { writeReport } = require('../lib/report.cjs');
 
 const REPORT_FILE_ENV = 'POKECLICKER_UNDERGROUND_REPORT_FILE';
+const MINE_TYPES = ['Random', 'Diamond', 'GemPlate', 'Shard', 'Fossil', 'EvolutionItem', 'Special'];
+const DEFAULT_LEVELS = [0, 10, 20, 30, 40, 50];
+const DEFAULT_MINES = 25;
 
 function usage() {
   return `Usage: ./simulators/underground/cli.cjs [options]
 
-Runs src/underground.js against the official PokéClicker TypeScript mining code.
+Runs underground.js against official PokéClicker mining code.
+Successful output is minified JSON; use --pretty for indented JSON.
 
 Options:
-  --mines N              Number of sequential mines (default: 100)
+  --mines N              Mines per configuration (default: 25)
   --seed N               Deterministic random seed (default: 1)
-  --level N              Fixed Underground level (default: 0)
+  --mine-types LIST      Matrix mine types (default: Random,Diamond,GemPlate,Shard,Fossil,EvolutionItem,Special)
+  --levels LIST          Matrix Underground levels (default: 0,10,20,30,40,50)
+  --single               Run one configuration instead of the matrix
+  --mine-type NAME       Single-mode mine type (default: Random)
+  --level N              Single-mode Underground level (default: 0)
   --region N             Highest unlocked region, 0 to 9 (default: 7)
-  --mine-type NAME       Random, Diamond, GemPlate, Shard, Fossil,
-                         EvolutionItem, or Special (default: Random)
   --game-dir PATH        PokéClicker checkout (default: ${defaultGameDir()})
-  --automation PATH      underground.js revision to test
-                         (default: ${defaultAutomationPath()})
+  --automation PATH      underground.js revision to test (default: ${defaultAutomationPath()})
   --max-ticks N          Safety limit per mine (default: 100000)
   --no-battery           Disable battery charging and discharge
-  --shared-rng           Use one continuous official SeededRand stream
+  --shared-rng           Use one continuous official SeededRand stream (single mode only)
   --trace-timing         Include detailed virtual-time diagnostics in JSON
-  --json                 Print machine-readable JSON
-  --per-mine             Include one summary line per mine
+  --pretty               Indent JSON with two spaces
+  --per-mine             Include individual mine results in JSON
   --help                 Show this help
 
 The game checkout must have its npm dependencies installed because the harness
@@ -45,18 +55,40 @@ function parsePositiveInteger(name, value) {
   return parsed;
 }
 
+function parseList(name, value, parser) {
+  const list = String(value).split(',').map((item) => parser(name, item));
+  if (!list.length || new Set(list).size !== list.length) {
+    throw new Error(`[pokeclicker-automation] underground-cli: ${name} expects a comma-separated list without duplicates, got ${value}`);
+  }
+  return list;
+}
+
+function parseMineType(name, value) {
+  const match = MINE_TYPES.find((type) => type.toLowerCase() === String(value).toLowerCase());
+  if (!match) throw new Error(`[pokeclicker-automation] underground-cli: ${name} must be one of ${MINE_TYPES.join(', ')}, got ${value}`);
+  return match;
+}
+
 function parseArgs(argv) {
   const options = {
-    mines: 100,
+    mines: DEFAULT_MINES,
     seed: 1,
+    mineTypes: [...MINE_TYPES],
+    levels: [...DEFAULT_LEVELS],
+    single: false,
+    mineType: 'Random',
     level: 0,
     region: 7,
-    mineType: 'Random',
     maxTicks: 100000,
     battery: true,
     pairedBoards: true,
-    json: false,
-    perMine: false,
+    traceTiming: false,
+    pretty: false,
+    includeMines: false,
+    mineTypesSpecified: false,
+    levelsSpecified: false,
+    mineTypeSpecified: false,
+    levelSpecified: false,
   };
   for (let index = 0; index < argv.length; index++) {
     const argument = argv[index];
@@ -68,75 +100,155 @@ function parseArgs(argv) {
     switch (argument) {
       case '--mines': options.mines = parsePositiveInteger(argument, next()); break;
       case '--seed': options.seed = parseInteger(argument, next()); break;
-      case '--level': options.level = parseInteger(argument, next()); break;
+      case '--mine-types': options.mineTypes = parseList(argument, next(), parseMineType); options.mineTypesSpecified = true; break;
+      case '--levels': options.levels = parseList(argument, next(), parseInteger); options.levelsSpecified = true; break;
+      case '--single': options.single = true; break;
+      case '--mine-type': options.mineType = parseMineType(argument, next()); options.mineTypeSpecified = true; break;
+      case '--level': options.level = parseInteger(argument, next()); options.levelSpecified = true; break;
       case '--region': options.region = parseInteger(argument, next()); break;
-      case '--mine-type': options.mineType = next(); break;
       case '--game-dir': options.gameDir = next(); break;
       case '--automation': options.automationPath = next(); break;
       case '--max-ticks': options.maxTicks = parsePositiveInteger(argument, next()); break;
       case '--no-battery': options.battery = false; break;
       case '--shared-rng': options.pairedBoards = false; break;
       case '--trace-timing': options.traceTiming = true; break;
-      case '--json': options.json = true; break;
-      case '--per-mine': options.perMine = true; break;
+      case '--pretty': options.pretty = true; break;
+      case '--per-mine': options.includeMines = true; break;
       case '--help': options.help = true; break;
       default: throw new Error(`[pokeclicker-automation] underground-cli: unknown option: ${argument}`);
     }
   }
+  if (options.single && options.mineTypesSpecified) throw new Error('[pokeclicker-automation] underground-cli: --mine-types cannot be used with --single');
+  if (options.single && options.levelsSpecified) throw new Error('[pokeclicker-automation] underground-cli: --levels cannot be used with --single');
+  if (!options.single && (options.mineTypeSpecified || options.levelSpecified)) {
+    throw new Error('[pokeclicker-automation] underground-cli: --mine-type and --level require --single');
+  }
   return options;
 }
 
-function formatCounter(counter, names) {
-  const entries = Object.entries(counter).map(([key, value]) => [names?.[key] || key, value]);
-  return entries.length ? entries.map(([key, value]) => `${key}=${value}`).join(', ') : 'none';
+function summarizeMines(mines) {
+  const sum = (field) => mines.reduce((total, mine) => total + mine[field], 0);
+  const sumCounters = (field) => mines.reduce((total, mine) => {
+    for (const [key, value] of Object.entries(mine[field] || {})) total[key] = (total[key] || 0) + value;
+    return total;
+  }, {});
+  return {
+    totals: {
+      mines: mines.length,
+      ticks: sum('ticks'),
+      simulatedSeconds: sum('simulatedSeconds'),
+      discoverySeconds: sum('discoverySeconds'),
+      itemsBuried: sum('itemsBuried'),
+      itemsFound: sum('itemsFound'),
+      itemsGained: sum('itemsGained'),
+      itemsDestroyed: sum('itemsDestroyed'),
+      layersRemoved: sum('layersRemoved'),
+      layersLeft: sum('layersLeft'),
+      toolsUsed: sumCounters('toolsUsed'),
+      batteryDischarges: sumCounters('batteryDischarges'),
+    },
+    distributions: {
+      ticksPerMine: summarizeSample(mines.map((mine) => mine.ticks)),
+      simulatedSecondsPerMine: summarizeSample(mines.map((mine) => mine.simulatedSeconds)),
+      layersRemovedPerMine: summarizeSample(mines.map((mine) => mine.layersRemoved)),
+      itemsPerMine: summarizeSample(mines.map((mine) => mine.itemsFound)),
+    },
+  };
 }
 
-function printReport(report, perMine) {
-  const { configuration, totals, averages, performance, officialSource, automationSource } = report;
-  const toolNames = { 0: 'chisel', 1: 'hammer', 2: 'bomb', 3: 'survey' };
-  console.log(`[pokeclicker-automation] underground-cli: Simulated ${configuration.mines} ${configuration.mineType} mine(s) at level ${configuration.level}`);
-  const dirtyMarker = officialSource.dirty === true ? ' (dirty worktree)' : '';
-  console.log(`[pokeclicker-automation] underground-cli: Official game: ${officialSource.revision || 'unknown revision'}${dirtyMarker} at ${officialSource.gameDir}`);
-  console.log(`[pokeclicker-automation] underground-cli: Automation: ${automationSource.path}`);
-  console.log(`[pokeclicker-automation] underground-cli: Completed: ${totals.itemsFound}/${totals.itemsBuried} items in ${totals.ticks} ticks`);
-  console.log(`[pokeclicker-automation] underground-cli: Virtual time: ${totals.simulatedSeconds.toFixed(3)} seconds (${totals.discoverySeconds.toFixed(3)} discovering mines)`);
-  console.log(`[pokeclicker-automation] underground-cli: Average: ${averages.ticksPerMine.toFixed(3)} ticks/mine, ${averages.simulatedSecondsPerMine.toFixed(3)} seconds/mine, ${averages.layersRemovedPerMine.toFixed(3)} layers/mine, ${averages.itemsPerMine.toFixed(3)} items/mine`);
-  console.log(`[pokeclicker-automation] underground-cli: Distributions: ticks median=${report.distributions.ticksPerMine.median.toFixed(3)}, p95=${report.distributions.ticksPerMine.p95.toFixed(3)}; time median=${report.distributions.simulatedSecondsPerMine.median.toFixed(3)}s, p95=${report.distributions.simulatedSecondsPerMine.p95.toFixed(3)}s; layers median=${report.distributions.layersRemovedPerMine.median.toFixed(3)}, p95=${report.distributions.layersRemovedPerMine.p95.toFixed(3)}; items median=${report.distributions.itemsPerMine.median.toFixed(3)}, p95=${report.distributions.itemsPerMine.p95.toFixed(3)}`);
-  console.log(`[pokeclicker-automation] underground-cli: Rewards: gained=${totals.itemsGained}, destroyed=${totals.itemsDestroyed}`);
-  console.log(`[pokeclicker-automation] underground-cli: Tools: ${formatCounter(totals.toolsUsed, toolNames)}`);
-  console.log(`[pokeclicker-automation] underground-cli: Battery: ${formatCounter(totals.batteryDischarges)}`);
-  console.log(`[pokeclicker-automation] underground-cli: Policy setup: ${performance.automationSetupElapsedMs.toFixed(2)} ms, ${performance.automationSetupMicrosecondsPerMine.toFixed(2)} microseconds/mine`);
-  console.log(`[pokeclicker-automation] underground-cli: Policy actions: ${performance.automationActionElapsedMs.toFixed(2)} ms, ${performance.automationActionMicrosecondsPerTick.toFixed(2)} microseconds/tick`);
-  console.log(`[pokeclicker-automation] underground-cli: Policy total: ${performance.automationElapsedMs.toFixed(2)} ms`);
-  console.log(`[pokeclicker-automation] underground-cli: Total runtime: ${performance.elapsedMs.toFixed(2)} ms, ${performance.minesPerSecond.toFixed(2)} mines/s`);
-  console.log(`[pokeclicker-automation] underground-cli: Official TypeScript modules loaded: ${officialSource.modulesLoaded.length}`);
-  if (perMine) {
-    report.mines.forEach((mine, index) => {
-      console.log(`[pokeclicker-automation] underground-cli: #${index + 1} ${mine.mineType}: ticks=${mine.ticks}, items=${mine.itemsFound}, layers=${mine.layersRemoved}, tools=[${formatCounter(mine.toolsUsed, toolNames)}]`);
-    });
+function workerArgs(options, mineType, level, seed) {
+  const args = ['--single', '--mines', String(options.mines), '--seed', String(seed), '--mine-type', mineType, '--level', String(level), '--region', String(options.region), '--max-ticks', String(options.maxTicks), '--per-mine'];
+  if (options.gameDir) args.push('--game-dir', options.gameDir);
+  if (options.automationPath) args.push('--automation', options.automationPath);
+  if (!options.battery) args.push('--no-battery');
+  if (options.traceTiming) args.push('--trace-timing');
+  return args;
+}
+
+function runWorker(options, mineType, level, seed, reportFile) {
+  const result = spawnSync(process.execPath, [__filename, ...workerArgs(options, mineType, level, seed)], {
+    encoding: 'utf8',
+    env: { ...process.env, [REPORT_FILE_ENV]: reportFile },
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  if (result.error) throw new Error(`[pokeclicker-automation] underground-cli: worker could not start: ${result.error.message}`);
+  if (result.status !== 0) throw new Error(`[pokeclicker-automation] underground-cli: worker failed:\n${result.stderr?.trim() || `exit status ${result.status}`}`);
+  try {
+    return JSON.parse(fs.readFileSync(reportFile, 'utf8'));
+  } catch (error) {
+    throw new Error(`[pokeclicker-automation] underground-cli: worker produced an invalid report: ${error.message}`);
   }
+}
+
+function runMatrix(options) {
+  if (!options.pairedBoards) throw new Error('[pokeclicker-automation] underground-cli: --shared-rng is only supported with --single');
+  if (!Number.isSafeInteger(options.seed) || options.seed < 0) throw new Error('[pokeclicker-automation] underground-cli: seed must be a non-negative safe integer');
+  const started = process.hrtime.bigint();
+  const reportDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pokeclicker-underground-matrix-'));
+  const allMines = [];
+  const configurations = [];
+  let automationSetupElapsedMs = 0;
+  let automationActionElapsedMs = 0;
+  let officialSource;
+  let automationSource;
+  try {
+    for (const level of options.levels) {
+      for (const mineType of options.mineTypes) {
+        const worker = runWorker(options, mineType, level, options.seed, path.join(reportDir, `${configurations.length}.json`));
+        const row = worker.configurations[0];
+        allMines.push(...row.mines);
+        configurations.push({ mineType, level, configurationSeed: row.configurationSeed, totals: row.totals, distributions: row.distributions, ...(options.includeMines ? { mines: row.mines } : {}) });
+        automationSetupElapsedMs += worker.performance.automationSetupElapsedMs;
+        automationActionElapsedMs += worker.performance.automationActionElapsedMs;
+        officialSource ||= worker.officialSource;
+        automationSource ||= worker.automationSource;
+      }
+    }
+  } finally {
+    fs.rmSync(reportDir, { recursive: true, force: true });
+  }
+  const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
+  const mines = allMines;
+  const overall = summarizeMines(mines);
+  return {
+    simulator: 'underground',
+    kind: 'run',
+    configuration: {
+      mode: 'matrix', seed: options.seed, mines: options.mines,
+      mineTypes: [...options.mineTypes], levels: [...options.levels],
+      region: options.region, battery: options.battery, pairedBoards: true,
+      maxTicks: options.maxTicks,
+    },
+    performance: {
+      elapsedMs,
+      automationSetupElapsedMs,
+      automationSetupMicrosecondsPerMine: automationSetupElapsedMs * 1000 / (options.mines * configurations.length),
+      automationActionElapsedMs,
+      automationActionMicrosecondsPerTick: overall.totals.ticks === 0 ? 0 : automationActionElapsedMs * 1000 / overall.totals.ticks,
+      automationElapsedMs: automationSetupElapsedMs + automationActionElapsedMs,
+      minesPerSecond: configurations.length * options.mines / (elapsedMs / 1000),
+    },
+    officialSource,
+    automationSource,
+    overall,
+    configurations,
+  };
 }
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) {
-    console.log(`[pokeclicker-automation] underground-cli: ${usage()}`);
+    console.log(usage());
+    return;
+  }
+  if (!options.single) {
+    writeReport(runMatrix(options), { file: process.env[REPORT_FILE_ENV], pretty: options.pretty });
     return;
   }
   const runtime = createRuntime(options);
   try {
-    const report = await runtime.run(options);
-    if (options.json) {
-      const json = JSON.stringify(report, null, 2);
-      const reportFile = process.env[REPORT_FILE_ENV];
-      if (reportFile) {
-        fs.writeFileSync(reportFile, json);
-      } else {
-        console.log(json);
-      }
-    } else {
-      printReport(report, options.perMine);
-    }
+    const report = await runtime.run({ ...options, includeMines: options.includeMines });
+    writeReport(report, { file: process.env[REPORT_FILE_ENV], pretty: options.pretty });
   } finally {
     runtime.restore();
   }
