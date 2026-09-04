@@ -547,31 +547,27 @@ const dungeon = (() => {
     }
   }
 
-  function takeAction(state, map) {
-    if (DungeonRunner.dungeonFinished()) {
-      // dungeon is finished
-      return;
-    }
-
-    if (state.timeLeft <= 0) {
-      // dungeon is failed
-      return;
-    }
-
-    if (DungeonRunner.fighting() || DungeonBattle.catching()) {
-      // can't take an action now
-      return;
-    }
-
-    const action = chooseDungeonAction(state);
-    executeDungeonAction(action, map);
-  }
-
   function completeDungeonMap(map) {
     const state = createDungeonState(map);
-    const actionSubscription = _runAndSubscribe(DungeonRunner.timeLeft, () => {
+    const actionSubscription = _runAndSubscribe(DungeonRunner.timeLeft, (timeLeft) => {
+      if (DungeonRunner.dungeonFinished()) {
+        // dungeon is finished
+        return;
+      }
+
+      if (timeLeft <= 0) {
+        // dungeon is failed
+        return;
+      }
+
+      if (DungeonRunner.fighting() || DungeonBattle.catching()) {
+        // can't take an action now
+        return;
+      }
+
       updateDungeonState(state, map);
-      takeAction(state, map);
+      const action = chooseDungeonAction(state);
+      executeDungeonAction(action, map);
     });
     const disposeSubscription = ko.when(DungeonRunner.dungeonFinished, () => actionSubscription.dispose());
 
