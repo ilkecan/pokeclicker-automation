@@ -40,7 +40,7 @@ const dungeon = (() => {
     };
   }
 
-  function createDungeonState(map) {
+  function createState(map) {
     const board = map.floorSizes.map((size, floor) =>
       Array.from({ length: size }, (_, y) =>
         Array.from({ length: size }, (_, x) => createTileState(x, y, floor))
@@ -84,7 +84,7 @@ const dungeon = (() => {
     }
   }
 
-  function updateDungeonState(state, map) {
+  function updateState(state, map) {
     state.options.fightAllBattles = AutomationSettings.getValue(SETTINGS_SECTION, "fightAllBattles");
     state.options.openAccessibleChests = AutomationSettings.getValue(SETTINGS_SECTION, "openAccessibleChests");
     state.options.minimumChestTier = AutomationSettings.getValue(SETTINGS_SECTION, "minimumChestTier");
@@ -454,7 +454,7 @@ const dungeon = (() => {
       moveAction(target);
   }
 
-  function chooseDungeonAction(state) {
+  function chooseAction(state) {
     const { options, progression, position, routeGrid } = state;
     if (state.timeLeft < GameConstants.BATTLE_TICK) {
       const chest = findBestTarget(state, routeGrid, (tile) => _and([
@@ -526,7 +526,7 @@ const dungeon = (() => {
     return moveToOrInteract(position, progression, progressInteraction(progression));
   }
 
-  function executeDungeonAction(action, map) {
+  function executeAction(action, map) {
     switch (action.type) {
       case ActionType.MOVE:
         map.moveToCoordinates(action.x, action.y, action.floor);
@@ -547,8 +547,8 @@ const dungeon = (() => {
     }
   }
 
-  function completeDungeonMap(map) {
-    const state = createDungeonState(map);
+  function completeMap(map) {
+    const state = createState(map);
     const actionSubscription = _runAndSubscribe(DungeonRunner.timeLeft, (timeLeft) => {
       if (DungeonRunner.dungeonFinished()) {
         // dungeon is finished
@@ -565,9 +565,9 @@ const dungeon = (() => {
         return;
       }
 
-      updateDungeonState(state, map);
-      const action = chooseDungeonAction(state);
-      executeDungeonAction(action, map);
+      updateState(state, map);
+      const action = chooseAction(state);
+      executeAction(action, map);
     });
     const disposeSubscription = ko.when(DungeonRunner.dungeonFinished, () => actionSubscription.dispose());
 
@@ -588,7 +588,7 @@ const dungeon = (() => {
     const subscription = _whenReady(shouldRun, () => {
       _disposeAll(subscriptions); // almost surely no-op
 
-      subscriptions = completeDungeonMap(DungeonRunner.map);
+      subscriptions = completeMap(DungeonRunner.map);
     });
 
     return [
@@ -598,8 +598,8 @@ const dungeon = (() => {
     ]
   }
 
-  function enterDungeon() {
-    DungeonRunner.initializeDungeon(player.town.dungeon);
+  function enter(dungeon) {
+    DungeonRunner.initializeDungeon(dungeon);
   }
 
   function areDungeonPokemonComplete(dungeon) {
@@ -607,7 +607,7 @@ const dungeon = (() => {
     return RouteHelper.listCompleted(dungeon.allAvailablePokemon(), includeShiny);
   }
 
-  function dungeonNeedsRestart(dungeon) {
+  function needsRestart(dungeon) {
     return _or([
       App.game.quests.currentQuests().some((quest) => _and([
         !quest.isCompleted(),
@@ -630,14 +630,14 @@ const dungeon = (() => {
       const dungeon = player.town.dungeon;
       if (_and([
         AutomationSettings.getValue(SETTINGS_SECTION, "smartAutoRestart"),
-        !dungeonNeedsRestart(dungeon),
+        !needsRestart(dungeon),
       ])) {
         return;
       }
 
       if (DungeonRunner.timeLeft() <= 0) {
         if (AutomationSettings.getValue(SETTINGS_SECTION, "restartUponLoss")) {
-          enterDungeon();
+          enter(dungeon);
         }
       } else {
         if (DungeonRunner.map?.currentTile().type() === GameConstants.DungeonTileType.entrance) {
@@ -646,7 +646,7 @@ const dungeon = (() => {
         }
 
         if (AutomationSettings.getValue(SETTINGS_SECTION, "restartUponWin")) {
-          enterDungeon();
+          enter(dungeon);
         }
       }
     });
@@ -663,8 +663,8 @@ const dungeon = (() => {
   return {
     ChestTier,
     automate,
-    chooseDungeonAction,
-    completeDungeonMap,
+    chooseAction,
+    completeMap,
     createRouteGrid,
   }
 })();
