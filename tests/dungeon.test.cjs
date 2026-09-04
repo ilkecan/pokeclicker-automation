@@ -30,9 +30,9 @@ function loadDungeon(t) {
   const loadedDungeon = createHarness(t).loadAutomation("dungeon", createDungeonGlobals()).automation;
   return {
     ...loadedDungeon,
-    chooseDungeonAction(state) {
+    chooseAction(state) {
       state.routeGrid = loadedDungeon.createRouteGrid(state);
-      return loadedDungeon.chooseDungeonAction(state);
+      return loadedDungeon.chooseAction(state);
     },
   };
 }
@@ -135,7 +135,7 @@ test("uses the fixed chest tier ordering before game initialization", () => {
 });
 
 test("exports the complete dungeon map entry point", () => {
-  assert.equal(typeof dungeon.completeDungeonMap, "function");
+  assert.equal(typeof dungeon.completeMap, "function");
 });
 
 test("stores predecessors alongside route costs", () => {
@@ -163,7 +163,7 @@ test("routes through a mandatory battle instead of a safe detour", () => {
   assert.equal(state.routeGrid.costs[0][1], 0);
   assert.equal(state.routeGrid.costs[1][1], 0);
   assert.equal(state.routeGrid.predecessors[1][1], battle);
-  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 1, y: 0 });
 });
 
 test("reconstructs adjacent zero-cost target chains", () => {
@@ -183,7 +183,7 @@ test("reconstructs adjacent zero-cost target chains", () => {
   assert.equal(state.routeGrid.costs[0][1], 0);
   assert.equal(state.routeGrid.costs[0][2], 0);
   assert.equal(state.routeGrid.predecessors[0][2], chest);
-  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 1, y: 0 });
 });
 
 test("leaves unreachable targets unselected", () => {
@@ -194,7 +194,7 @@ test("leaves unreachable targets unselected", () => {
   state.board[0][3][4] = null;
   state.board[0][4][3] = null;
 
-  const action = dungeon.chooseDungeonAction(state);
+  const action = dungeon.chooseAction(state);
   assert.equal(action.type, "move");
 });
 
@@ -205,7 +205,7 @@ test("moves toward an inaccessible battle during target discovery", (t) => {
     targetCounts: { chests: 0, battles: 2 },
   });
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 2, y: 1 });
+  assertMove(dungeon.chooseAction(state), { x: 2, y: 1 });
 });
 
 test("finds an inaccessible battle beyond an accessible battle", (t) => {
@@ -219,7 +219,7 @@ test("finds an inaccessible battle beyond an accessible battle", (t) => {
   accessibleBattle.isVisible = true;
   accessibleBattle.type = DungeonTileType.enemy;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
+  assertMove(dungeon.chooseAction(state), { x: 0, y: 1 });
 });
 
 test("chooses the inaccessible battle with the shortest time path", (t) => {
@@ -237,7 +237,7 @@ test("chooses the inaccessible battle with the shortest time path", (t) => {
   closerBattle.isVisible = true;
   closerBattle.type = DungeonTileType.enemy;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 1 });
+  assertMove(dungeon.chooseAction(state), { x: 4, y: 1 });
 });
 
 test("uses every visited tile as a zero-cost route source", (t) => {
@@ -250,7 +250,7 @@ test("uses every visited tile as a zero-cost route source", (t) => {
   state.position = { x: 0, y: 1, floor: 0 };
   state.progression.isVisited = false;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 1, y: 0 });
 });
 
 
@@ -265,7 +265,7 @@ test("finds an inaccessible chest beyond an accessible chest", (t) => {
   accessibleChest.isVisible = true;
   accessibleChest.type = DungeonTileType.chest;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
+  assertMove(dungeon.chooseAction(state), { x: 0, y: 1 });
 });
 
 test("routes to inaccessible chests before opening accessible chests", (t) => {
@@ -280,7 +280,7 @@ test("routes to inaccessible chests before opening accessible chests", (t) => {
   accessibleChest.isVisible = true;
   accessibleChest.type = DungeonTileType.chest;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
+  assertMove(dungeon.chooseAction(state), { x: 0, y: 1 });
 });
 
 test("progresses before opening accessible chests when disabled", (t) => {
@@ -291,7 +291,7 @@ test("progresses before opening accessible chests when disabled", (t) => {
     progressionPosition: [4, 0],
   });
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 4, y: 0 });
 });
 
 test("does not reveal the floor early when opening accessible chests is disabled", (t) => {
@@ -316,7 +316,7 @@ test("does not reveal the floor early when opening accessible chests is disabled
     chest.chestTier = tier;
   }
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 1, y: 0 });
 });
 
 
@@ -342,7 +342,7 @@ test("does not count visible chests below the minimum tier toward revealing the 
     chest.chestTier = tier;
   }
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 1, y: 0 });
 });
 
 test("does not open chests early when fighting all battles", (t) => {
@@ -367,7 +367,7 @@ test("does not open chests early when fighting all battles", (t) => {
     chest.chestTier = "rare";
   }
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 1, y: 0 });
 });
 
 test("opens accessible common chests by default", (t) => {
@@ -378,7 +378,7 @@ test("opens accessible common chests by default", (t) => {
     progressionPosition: [4, 0],
   });
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 1, y: 0 });
 });
 
 test("opens every accessible chest when the run cannot progress", (t) => {
@@ -399,19 +399,19 @@ test("opens every accessible chest when the run cannot progress", (t) => {
   secondChest.type = DungeonTileType.chest;
   secondChest.chestTier = "common";
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 2, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 2, y: 0 });
 
   state.position = { x: 2, y: 0, floor: 0 };
   firstChest.isVisited = true;
-  assertInteract(dungeon.chooseDungeonAction(state), "chest");
+  assertInteract(dungeon.chooseAction(state), "chest");
   firstChest.type = null;
-  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 1 });
+  assertMove(dungeon.chooseAction(state), { x: 1, y: 1 });
 
   state.position = { x: 1, y: 1, floor: 0 };
   secondChest.isVisited = true;
-  assertInteract(dungeon.chooseDungeonAction(state), "chest");
+  assertInteract(dungeon.chooseAction(state), "chest");
   secondChest.type = null;
-  assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 4, y: 0 });
 });
 
 test("does not salvage chests at the battle tick boundary", (t) => {
@@ -423,7 +423,7 @@ test("does not salvage chests at the battle tick boundary", (t) => {
   });
   state.timeLeft = GameConstants.BATTLE_TICK;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 4, y: 0 });
 });
 
 test("salvages the current chest before remote accessible chests", (t) => {
@@ -446,7 +446,7 @@ test("salvages the current chest before remote accessible chests", (t) => {
   currentChest.type = DungeonTileType.chest;
   currentChest.chestTier = "common";
 
-  assertInteract(dungeon.chooseDungeonAction(state), "chest");
+  assertInteract(dungeon.chooseAction(state), "chest");
 });
 
 test("skips accessible common chests", (t) => {
@@ -462,7 +462,7 @@ test("skips accessible common chests", (t) => {
   rareChest.type = DungeonTileType.chest;
   rareChest.chestTier = "rare";
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 2, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 2, y: 0 });
 });
 
 test("progresses when only accessible chests are common", (t) => {
@@ -474,7 +474,7 @@ test("progresses when only accessible chests are common", (t) => {
     progressionPosition: [4, 0],
   });
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 4, y: 0 });
 });
 
 test("opens the first accessible chest at or above the minimum tier", (t) => {
@@ -494,7 +494,7 @@ test("opens the first accessible chest at or above the minimum tier", (t) => {
   epicChest.type = DungeonTileType.chest;
   epicChest.chestTier = "epic";
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 3, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 3, y: 0 });
 });
 
 test("prioritizes inaccessible progression over secondary targets", (t) => {
@@ -508,7 +508,7 @@ test("prioritizes inaccessible progression over secondary targets", (t) => {
   progression.type = DungeonTileType.boss;
   state.progression = progression;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
+  assertMove(dungeon.chooseAction(state), { x: 0, y: 1 });
 });
 
 test("follows inaccessible progression before accessible secondary targets", (t) => {
@@ -525,7 +525,7 @@ test("follows inaccessible progression before accessible secondary targets", (t)
   accessibleBattle.isVisible = true;
   accessibleBattle.type = DungeonTileType.enemy;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
+  assertMove(dungeon.chooseAction(state), { x: 0, y: 1 });
 });
 
 test("moves toward an inaccessible battle after all targets are visible", (t) => {
@@ -536,7 +536,7 @@ test("moves toward an inaccessible battle after all targets are visible", (t) =>
     progressionPosition: [4, 0],
   });
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 1 });
+  assertMove(dungeon.chooseAction(state), { x: 4, y: 1 });
 });
 
 test("moves toward an inaccessible chest from the closest visited tile", (t) => {
@@ -547,7 +547,7 @@ test("moves toward an inaccessible chest from the closest visited tile", (t) => 
     progressionPosition: [4, 0],
   });
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 4, y: 1 });
+  assertMove(dungeon.chooseAction(state), { x: 4, y: 1 });
 });
 
 test("prefers non-battle exploration tiles when battles are disabled", (t) => {
@@ -563,7 +563,7 @@ test("prefers non-battle exploration tiles when battles are disabled", (t) => {
   chest.isVisible = true;
   chest.type = DungeonTileType.chest;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
+  assertMove(dungeon.chooseAction(state), { x: 0, y: 1 });
 });
 
 test("does not classify unseen tiles as non-battles", (t) => {
@@ -576,7 +576,7 @@ test("does not classify unseen tiles as non-battles", (t) => {
   chest.isVisible = true;
   chest.type = DungeonTileType.chest;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
+  assertMove(dungeon.chooseAction(state), { x: 0, y: 1 });
 });
 
 test("prefers non-battle exploration regardless of fight-all", (t) => {
@@ -592,7 +592,7 @@ test("prefers non-battle exploration regardless of fight-all", (t) => {
   chest.isVisible = true;
   chest.type = DungeonTileType.chest;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 0, y: 1 });
+  assertMove(dungeon.chooseAction(state), { x: 0, y: 1 });
 });
 
 test("does not explore non-battle neighbours when every target is visible", (t) => {
@@ -608,7 +608,7 @@ test("does not explore non-battle neighbours when every target is visible", (t) 
   emptyTile.isVisible = true;
   emptyTile.type = DungeonTileType.empty;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 1, y: 0 });
 });
 
 test("routes through a mandatory battle to visible progression", (t) => {
@@ -628,7 +628,7 @@ test("routes through a mandatory battle to visible progression", (t) => {
   emptyPathTile.isVisible = true;
   emptyPathTile.type = DungeonTileType.empty;
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 1, y: 0 });
 });
 
 test("routes through a mandatory battle on a shorter path", (t) => {
@@ -650,7 +650,7 @@ test("routes through a mandatory battle on a shorter path", (t) => {
     emptyPathTile.type = DungeonTileType.empty;
   }
 
-  assertMove(dungeon.chooseDungeonAction(state), { x: 1, y: 0 });
+  assertMove(dungeon.chooseAction(state), { x: 1, y: 0 });
 });
 
 test("keeps normal exploration when no target is available", (t) => {
@@ -659,7 +659,7 @@ test("keeps normal exploration when no target is available", (t) => {
     visited: [[0, 0]],
   });
 
-  const action = dungeon.chooseDungeonAction(state);
+  const action = dungeon.chooseAction(state);
   assert.equal(action.type, "move");
   const tile = state.board[action.floor][action.y][action.x];
   assert.equal(tile.isVisited, false);
