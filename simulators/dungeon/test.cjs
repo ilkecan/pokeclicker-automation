@@ -89,6 +89,9 @@ const dungeon = (() => {
     if (!AutomationSettings.getValue("dungeon", "openAccessibleChests")) {
       throw new Error("openAccessibleChests was not applied");
     }
+    if (AutomationSettings.getValue("dungeon", "minimumChestTier") !== "rare") {
+      throw new Error("minimumChestTier was not applied");
+    }
     DungeonRunner.dungeonFinished(true);
     return [];
   }
@@ -102,8 +105,10 @@ const dungeon = (() => {
       maps: 1,
       size: 5,
       settings: { fightAllBattles: false, openAccessibleChests: true, searchAllChests: false },
+      minimumChestTier: 'rare',
     });
     assert.equal(report.configurations[0].settings.openAccessibleChests, true);
+    assert.equal(report.configurations[0].settings.minimumChestTier, 'rare');
   } finally {
     runtime.restore();
     fs.rmSync(directory, { recursive: true, force: true });

@@ -386,7 +386,7 @@ function createRuntime(options = {}) {
   }
 
   async function simulateMap(size, flashTier, mapIndex, settings, chestTier, minimumChestTier, rootSeed) {
-    currentSettings = { ...settings };
+    currentSettings = { ...settings, minimumChestTier };
     const configurationSeed = deriveConfigurationSeed(rootSeed, 'dungeon', { size, flashTier, settings });
     const mapSeed = configurationSeed + mapIndex * 2;
     officialRandom.seed(mapSeed);
