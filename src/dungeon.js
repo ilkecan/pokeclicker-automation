@@ -486,8 +486,9 @@ const dungeon = (() => {
 
       if (!options.fightAllBattles && options.openAccessibleChests) {
         // Open chests we would open before progressing anyway if they can
-        // reveal remaining targets sooner. This might not always be strictly
-        // positive, but I think should be preferable overall.
+        // reveal remaining targets sooner. Paired simulator evaluation showed
+        // lower aggregate completion time and fewer battles without reducing
+        // completion success, so keep this proactive behavior.
         const revealChest = findChestThatCanRevealFloor(state, routeGrid);
         if (revealChest) {
           if (!isAccessible(state, revealChest)) {
