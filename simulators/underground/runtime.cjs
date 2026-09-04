@@ -16,6 +16,7 @@ const {
   sha256,
 } = require('../../lib/runtime.cjs');
 const { summarizeSample } = require('../lib/statistics.cjs');
+const { deriveConfigurationSeed } = require('../lib/seeding.cjs');
 const { createVirtualClock } = require('../lib/virtual-clock.cjs');
 
 const REQUIRED_GAME_FILES = [
@@ -419,9 +420,9 @@ function createRuntime(options = {}) {
       return MineType[match];
     }
 
-    function createMine(mineTypeName, mineIndex) {
+    function createMine(mineTypeName, mineIndex, configurationSeed) {
       if (options.pairedBoards !== false) {
-        officialRandom.seed(seed + mineIndex * 2);
+        officialRandom.seed(configurationSeed + mineIndex * 2);
       }
       const mineType = resolveMineType(mineTypeName);
       const minimumItems = Underground.calculateMinimumItemsToGenerate(level);
@@ -440,15 +441,15 @@ function createRuntime(options = {}) {
       });
       mine.generate();
       if (options.pairedBoards !== false) {
-        officialRandom.seed(seed + mineIndex * 2 + 1);
+        officialRandom.seed(configurationSeed + mineIndex * 2 + 1);
       }
       mineObservable(mine);
       flushKnockoutTasks('setup');
       return mine;
     }
 
-    async function simulateMine(mineTypeName, mineIndex, maxTicks = 100000) {
-      const mine = createMine(mineTypeName, mineIndex);
+    async function simulateMine(mineTypeName, mineIndex, maxTicks = 100000, configurationSeed = seed) {
+      const mine = createMine(mineTypeName, mineIndex, configurationSeed);
       const startedVirtualTime = clock.now;
       const automationTicksBefore = automationTicks;
       const discoverySeconds = mine.timeUntilDiscovery;
@@ -510,14 +511,14 @@ function createRuntime(options = {}) {
 
     let hasRun = false;
     return {
-      async run({ mines = 100, mineType = 'Random', maxTicks = 100000 } = {}) {
+      async run({ mines = 100, mineType = 'Random', maxTicks = 100000, includeMines = false } = {}) {
         if (restored) throw new Error('[pokeclicker-automation] underground-runtime: runtime has been restored and cannot be run');
         if (hasRun) throw new Error('[pokeclicker-automation] underground-runtime: runtime can only be run once');
         if (!Number.isInteger(mines) || mines < 1) throw new Error(`[pokeclicker-automation] underground-runtime: mines must be a positive integer, got ${mines}`);
         if (!Number.isInteger(maxTicks) || maxTicks < 1) throw new Error(`[pokeclicker-automation] underground-runtime: maxTicks must be a positive integer, got ${maxTicks}`);
-        if (options.pairedBoards !== false && seed + mines * 2 > Number.MAX_SAFE_INTEGER) {
-          throw new Error('[pokeclicker-automation] underground-runtime: seed and mine count exceed the safe integer range for paired streams');
-        }
+        const resolvedMineType = resolveMineType(mineType);
+        const canonicalMineType = MineType[resolvedMineType];
+        const configurationSeed = deriveConfigurationSeed(seed, 'underground', { mineType: canonicalMineType, level });
         hasRun = true;
         const started = process.hrtime.bigint();
         measureAutomation('setup', () => {
@@ -525,7 +526,7 @@ function createRuntime(options = {}) {
         });
         const results = [];
         for (let index = 0; index < mines; index++) {
-          results.push(await simulateMine(mineType, index, maxTicks));
+          results.push(await simulateMine(canonicalMineType, index, maxTicks, configurationSeed));
         }
         const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
         const automationSetupElapsedMs = Number(automationSetupElapsedNanoseconds) / 1e6;
@@ -553,28 +554,25 @@ function createRuntime(options = {}) {
           batteryDischarges: {},
         });
 
+        const distributions = {
+          ticksPerMine: summarizeSample(results.map((mine) => mine.ticks)),
+          simulatedSecondsPerMine: summarizeSample(results.map((mine) => mine.simulatedSeconds)),
+          layersRemovedPerMine: summarizeSample(results.map((mine) => mine.layersRemoved)),
+          itemsPerMine: summarizeSample(results.map((mine) => mine.itemsFound)),
+        };
+        const summary = { totals, distributions };
         return {
+          simulator: 'underground',
+          kind: 'run',
           configuration: {
+            mode: 'single',
             seed,
             level,
             region,
             mines,
-            mineType,
+            mineType: canonicalMineType,
             battery: options.battery !== false,
             pairedBoards: options.pairedBoards !== false,
-          },
-          totals,
-          averages: {
-            ticksPerMine: totals.ticks / mines,
-            simulatedSecondsPerMine: totals.simulatedSeconds / mines,
-            layersRemovedPerMine: totals.layersRemoved / mines,
-            itemsPerMine: totals.itemsFound / mines,
-          },
-          distributions: {
-            ticksPerMine: summarizeSample(results.map((mine) => mine.ticks)),
-            simulatedSecondsPerMine: summarizeSample(results.map((mine) => mine.simulatedSeconds)),
-            layersRemovedPerMine: summarizeSample(results.map((mine) => mine.layersRemoved)),
-            itemsPerMine: summarizeSample(results.map((mine) => mine.itemsFound)),
           },
           performance: {
             elapsedMs,
@@ -594,11 +592,15 @@ function createRuntime(options = {}) {
             coreHashes: Object.fromEntries(REQUIRED_GAME_FILES.map((relative) => [relative, sha256(path.join(gameDir, relative))])),
             timingSourceHashes: Object.fromEntries(TIMING_SOURCE_FILES.map((relative) => [relative, sha256(path.join(gameDir, relative))])),
           },
-          automationSource: {
-            path: automationPath,
-            sha256: sha256(automationPath),
-          },
-          mines: results,
+          automationSource: { path: automationPath, sha256: sha256(automationPath) },
+          overall: summary,
+          configurations: [{
+            mineType: canonicalMineType,
+            level,
+            configurationSeed,
+            ...summary,
+            ...(includeMines ? { mines: results } : {}),
+          }],
         };
       },
       restore,
