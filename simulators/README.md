@@ -6,11 +6,11 @@ Each automation area has its own directory. Area-independent simulator-specific 
 
 ## Available simulators
 
-The [Underground simulator](underground/) runs and compares mining policies:
+The [Underground simulator](underground/) runs and compares mining policies across mine-type and level configurations:
 
 ```sh
-just simulator underground run --mines 1000 --seed 42 --level 30
-just simulator underground compare baseline.js candidate.js --mines 2000 --seed 42 --level 30
+just simulator underground run --seed 42
+just simulator underground compare baseline.js candidate.js --seed 42
 just simulator underground test
 ```
 
@@ -22,6 +22,6 @@ just simulator dungeon compare baseline.js candidate.js --maps 2000 --seed 42
 just simulator dungeon test
 ```
 
-Both simulators report reproducible virtual outcomes, distribution statistics, policy timing, and official-source provenance.
+Both simulators emit one minified JSON report for successful runs and comparisons by default. Use `--pretty` for human-readable indentation and the simulator-specific `--per-map` or `--per-mine` flag for individual results.
 
 Run these commands inside the repository's devenv environment.
