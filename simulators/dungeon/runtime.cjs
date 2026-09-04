@@ -15,6 +15,7 @@ const {
   sha256,
 } = require('../../lib/runtime.cjs');
 const { summarizeSample } = require('../lib/statistics.cjs');
+const { deriveConfigurationSeed } = require('../lib/seeding.cjs');
 const { createVirtualClock } = require('../lib/virtual-clock.cjs');
 
 const REQUIRED_GAME_FILES = [
@@ -33,7 +34,8 @@ const DUNGEON_SCRIPTS = [
 const TIMING_SOURCE_FILES = ['src/scripts/App.ts', 'src/scripts/Game.ts'];
 const CHEST_TIERS = ['common', 'rare', 'epic', 'legendary', 'mythic'];
 const DEFAULT_SIZES = [5, 10, 14];
-const DEFAULT_MAPS = 1000;
+const DEFAULT_FLASH_TIERS = [0, 1, 2, 3];
+const DEFAULT_MAPS = 250;
 
 function defaultGameDir() {
   return resolveGameDir(path.resolve(__dirname, '..', '..'));
@@ -51,13 +53,6 @@ function mapHash(map) {
   return crypto.createHash('sha256').update(JSON.stringify({ floorSizes: map.floorSizes, board })).digest('hex');
 }
 
-function formatSettings(settings) {
-  const enabled = [];
-  if (settings.fightAllBattles) enabled.push('fight');
-  if (settings.openAccessibleChests) enabled.push('open');
-  if (settings.searchAllChests) enabled.push('search');
-  return enabled.length ? enabled.join('+') : 'basic';
-}
 
 function allConfigurations() {
   return Array.from({ length: 8 }, (_, value) => ({
@@ -73,12 +68,6 @@ function validatePositiveInteger(name, value) {
   }
 }
 
-function validateNonNegativeInteger(name, value) {
-  if (!Number.isInteger(value) || value < 0) {
-    throw new Error(`[pokeclicker-automation] dungeon-runtime: ${name} must be a non-negative integer, got ${value}`);
-  }
-}
-
 function validateSize(size) {
   if (!Number.isInteger(size) || size < 5 || size > 14) {
     throw new Error(`[pokeclicker-automation] dungeon-runtime: size must be an integer from 5 to 14, got ${size}`);
@@ -90,11 +79,25 @@ function validateTier(name, value) {
     throw new Error(`[pokeclicker-automation] dungeon-runtime: ${name} must be one of ${CHEST_TIERS.join(', ')}, got ${value}`);
   }
 }
+function validateFlashTier(value) {
+  if (!Number.isInteger(value) || value < 0 || value > 3) {
+    throw new Error(`[pokeclicker-automation] dungeon-runtime: flashTier must be an integer from 0 to 3, got ${value}`);
+  }
+}
+
+function dungeonClearsForFlashTier(flashTier) {
+  return [0, 100, 250, 400][flashTier];
+}
+
+function validateUniqueList(name, values) {
+  if (new Set(values).size !== values.length) {
+    throw new Error(`[pokeclicker-automation] dungeon-runtime: ${name} must not contain duplicates`);
+  }
+}
 function createRuntime(options = {}) {
   const gameDir = path.resolve(options.gameDir || process.env.POKECLICKER_DIR || defaultGameDir());
   const automationPath = path.resolve(options.automationPath || defaultAutomationPath());
   const seed = Number(options.seed ?? 1);
-  const dungeonClears = Number(options.dungeonClears ?? 0);
   const battleTicks = Number(options.battleTicks ?? 1);
   const bossTicks = Number(options.bossTicks ?? 1);
   const ko = require(path.join(gameDir, 'node_modules', 'knockout'));
@@ -333,7 +336,6 @@ function createRuntime(options = {}) {
   let currentSettings = {};
   try {
     validatePositiveInteger('battleTicks', battleTicks);
-    validateNonNegativeInteger('dungeonClears', dungeonClears);
     validatePositiveInteger('bossTicks', bossTicks);
     installEnvironment();
   } catch (error) {
@@ -383,17 +385,17 @@ function createRuntime(options = {}) {
     };
   }
 
-  async function simulateMap(size, mapIndex, settings, chestTier, minimumChestTier, rootSeed) {
-    const mapSeed = rootSeed + mapIndex * 2;
+  async function simulateMap(size, flashTier, mapIndex, settings, chestTier, minimumChestTier, rootSeed) {
+    const configurationSeed = deriveConfigurationSeed(rootSeed, 'dungeon', { size, flashTier, settings });
+    const mapSeed = configurationSeed + mapIndex * 2;
     officialRandom.seed(mapSeed);
     const fixture = createFixture();
-    context.App.game.statistics.dungeonsCleared[GameConstants.getDungeonIndex(fixture.name)](dungeonClears);
+    context.App.game.statistics.dungeonsCleared[GameConstants.getDungeonIndex(fixture.name)](dungeonClearsForFlashTier(flashTier));
     const map = new DungeonMap(size, () => ({
       tier: chestTier,
       loot: { loot: 'simulated loot', amount: 1, ignoreDebuff: false },
     }), DungeonRunner.getFlash(fixture.name));
     const initialHash = mapHash(map);
-    currentSettings = { ...settings, minimumChestTier };
     resetRunner(map, fixture);
     const startedVirtualTime = clock.now;
     const subscriptions = measure('setup', () => automationModule.completeDungeonMap(map));
@@ -437,13 +439,13 @@ function createRuntime(options = {}) {
     };
   }
 
-  function scenarioDefinitions({ single, size, sizes, settings }) {
-    if (single) return [{ size, settings: { ...settings }, label: formatSettings(settings) }];
-    return sizes.flatMap((scenarioSize) => allConfigurations().map((scenarioSettings) => ({
+  function scenarioDefinitions({ single, size, sizes, flashTier, flashTiers, settings }) {
+    if (single) return [{ size, flashTier, settings: { ...settings } }];
+    return sizes.flatMap((scenarioSize) => flashTiers.flatMap((scenarioFlashTier) => allConfigurations().map((scenarioSettings) => ({
       size: scenarioSize,
+      flashTier: scenarioFlashTier,
       settings: scenarioSettings,
-      label: formatSettings(scenarioSettings),
-    })));
+    }))));
   }
 
   function summarizeScenario(results) {
@@ -459,34 +461,28 @@ function createRuntime(options = {}) {
       bossBattles: sum('bossBattles'),
       chestsOpened: sum('chestsOpened'),
     };
-    const completionTimes = completed.map((result) => result.simulatedSeconds);
-    const distributions = {
-      completionSeconds: summarizeSample(completionTimes),
-      regularBattles: summarizeSample(results.map((result) => result.regularBattles)),
-      bossBattles: summarizeSample(results.map((result) => result.bossBattles)),
-      chestsOpened: summarizeSample(results.map((result) => result.chestsOpened)),
-    };
     return {
       totals,
-      averages: {
-        completionSeconds: distributions.completionSeconds.mean,
-        regularBattles: distributions.regularBattles.mean,
-        bossBattles: distributions.bossBattles.mean,
-        chestsOpened: distributions.chestsOpened.mean,
+      distributions: {
+        completionSeconds: summarizeSample(completed.map((result) => result.simulatedSeconds)),
+        regularBattles: summarizeSample(results.map((result) => result.regularBattles)),
+        bossBattles: summarizeSample(results.map((result) => result.bossBattles)),
+        chestsOpened: summarizeSample(results.map((result) => result.chestsOpened)),
       },
-      distributions,
     };
   }
-
   return {
     async run({
       maps = DEFAULT_MAPS,
       sizes = DEFAULT_SIZES,
+      flashTiers = DEFAULT_FLASH_TIERS,
       single = false,
       size = 5,
+      flashTier = 0,
       settings = { fightAllBattles: false, openAccessibleChests: false, searchAllChests: false },
       chestTier = 'common',
       minimumChestTier = 'common',
+      includeMaps = false,
     } = {}) {
       if (restored) throw new Error('[pokeclicker-automation] dungeon-runtime: runtime has been restored and cannot be run');
       if (hasRun) throw new Error('[pokeclicker-automation] dungeon-runtime: runtime can only be run once');
@@ -495,24 +491,31 @@ function createRuntime(options = {}) {
       validateTier('minimumChestTier', minimumChestTier);
       validateSize(size);
       sizes.forEach(validateSize);
-      if (!Number.isSafeInteger(seed) || seed + maps * 2 > Number.MAX_SAFE_INTEGER) {
-        throw new Error('[pokeclicker-automation] dungeon-runtime: seed and map count exceed the safe integer range');
+      validateFlashTier(flashTier);
+      flashTiers.forEach(validateFlashTier);
+      validateUniqueList('sizes', sizes);
+      validateUniqueList('flashTiers', flashTiers);
+      if (!Number.isSafeInteger(seed)) {
+        throw new Error('[pokeclicker-automation] dungeon-runtime: seed must be a safe integer');
       }
       hasRun = true;
       const started = process.hrtime.bigint();
-      const definitions = scenarioDefinitions({ single, size, sizes, settings });
-      const scenarios = [];
+      const definitions = scenarioDefinitions({ single, size, sizes, flashTier, flashTiers, settings });
+      const configurations = [];
+      const allResults = [];
       for (const definition of definitions) {
         const results = [];
         for (let mapIndex = 0; mapIndex < maps; mapIndex++) {
-          results.push(await simulateMap(definition.size, mapIndex, definition.settings, chestTier, minimumChestTier, seed));
+          results.push(await simulateMap(definition.size, definition.flashTier, mapIndex, definition.settings, chestTier, minimumChestTier, seed));
         }
-        scenarios.push({
+        allResults.push(...results);
+        configurations.push({
           size: definition.size,
-          label: definition.label,
+          flashTier: definition.flashTier,
+          configurationSeed: deriveConfigurationSeed(seed, 'dungeon', { size: definition.size, flashTier: definition.flashTier, settings: definition.settings }),
           settings: { ...definition.settings, minimumChestTier },
           ...summarizeScenario(results),
-          maps: results,
+          ...(includeMaps ? { maps: results } : {}),
         });
       }
       const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
@@ -525,12 +528,14 @@ function createRuntime(options = {}) {
         ...DUNGEON_SCRIPTS,
       ])].sort();
       return {
+        simulator: 'dungeon',
+        kind: 'run',
         configuration: {
           mode: single ? 'single' : 'matrix',
-          dungeonClears,
           seed,
           maps,
           sizes: single ? [size] : [...sizes],
+          flashTiers: single ? [flashTier] : [...flashTiers],
           chestTier,
           minimumChestTier,
           battleTicks,
@@ -540,11 +545,11 @@ function createRuntime(options = {}) {
         performance: {
           elapsedMs,
           automationSetupElapsedMs: setupMs,
-          automationSetupMicrosecondsPerMap: setupMs * 1000 / (maps * scenarios.length),
+          automationSetupMicrosecondsPerMap: setupMs * 1000 / (maps * configurations.length),
           automationActionElapsedMs: actionMs,
           automationActionMicrosecondsPerCallback: policyCallbackCount === 0 ? 0 : actionMs * 1000 / policyCallbackCount,
           automationElapsedMs: automationMs,
-          mapsPerSecond: scenarios.length * maps / (elapsedMs / 1000),
+          mapsPerSecond: configurations.length * maps / (elapsedMs / 1000),
         },
         officialSource: {
           gameDir,
@@ -556,7 +561,8 @@ function createRuntime(options = {}) {
           timingSourceHashes: Object.fromEntries(TIMING_SOURCE_FILES.map((relative) => [relative, sha256(path.join(gameDir, relative))])),
         },
         automationSource: { path: automationPath, sha256: sha256(automationPath) },
-        scenarios,
+        overall: summarizeScenario(allResults),
+        configurations,
       };
     },
     restore,
