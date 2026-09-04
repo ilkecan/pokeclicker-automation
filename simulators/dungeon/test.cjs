@@ -2,6 +2,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 const { createRuntime, defaultGameDir } = require('./runtime.cjs');
@@ -77,6 +79,37 @@ const comparisonReport = JSON.parse(comparison.stdout);
 assert.equal(comparisonReport.configurations.length, 16);
 assert.equal(comparisonReport.overall.pairedDelta.completionSeconds.mean, 0);
 
+
+async function testRuntimeSettings() {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pokeclicker-dungeon-settings-'));
+  const automationPath = path.join(directory, 'automation.js');
+  fs.writeFileSync(automationPath, `"use strict";
+const dungeon = (() => {
+  function completeDungeonMap() {
+    if (!AutomationSettings.getValue("dungeon", "openAccessibleChests")) {
+      throw new Error("openAccessibleChests was not applied");
+    }
+    DungeonRunner.dungeonFinished(true);
+    return [];
+  }
+  return { completeDungeonMap };
+})();
+`);
+  const runtime = createRuntime({ automationPath, gameDir: defaultGameDir(), seed: 99 });
+  try {
+    const report = await runtime.run({
+      single: true,
+      maps: 1,
+      size: 5,
+      settings: { fightAllBattles: false, openAccessibleChests: true, searchAllChests: false },
+    });
+    assert.equal(report.configurations[0].settings.openAccessibleChests, true);
+  } finally {
+    runtime.restore();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
 async function testRuntimeLifecycle() {
   const runtime = createRuntime({ gameDir: defaultGameDir(), seed: 99 });
   try {
@@ -89,7 +122,7 @@ async function testRuntimeLifecycle() {
   await assert.rejects(runtime.run({ single: true, maps: 1, size: 5 }), /runtime has been restored/);
 }
 
-testRuntimeLifecycle().then(() => {
+testRuntimeSettings().then(() => testRuntimeLifecycle()).then(() => {
   console.log('[pokeclicker-automation] tests: dungeon simulator tests passed');
 }).catch((error) => {
   console.error('[pokeclicker-automation] tests: dungeon simulator tests failed', error.stack || error);
