@@ -13,6 +13,7 @@ const safari = (() => {
   const ActionType = Object.freeze({
     MOVE: "move",
     THROW_BALL: "throwBall",
+    RUN: "run",
   });
 
   function createGrid(height, width, value) {
@@ -194,6 +195,10 @@ const safari = (() => {
 
   function* pokemonCandidates(state) {
     for (const pokemon of state.pokemons) {
+      if (!_shouldCatchPokemon(pokemon)) {
+        continue;
+      }
+
       const distance = distanceTo(state, pokemon);
       if (!Number.isFinite(distance)) {
         // unreachable target
@@ -281,7 +286,11 @@ const safari = (() => {
   }
 
   function chooseAction(state) {
-    if (state.inBattle && !state.busy && state.balls > 0 && state.enemy) {
+    if (state.inBattle && !state.busy && state.enemy) {
+      if (!_shouldCatchPokemon(state.enemy)) {
+        return { type: ActionType.RUN };
+      }
+
       return { type: ActionType.THROW_BALL };
     }
 
@@ -291,12 +300,15 @@ const safari = (() => {
 
   function executeAction(action) {
     switch (action.type) {
-      case ActionType.THROW_BALL:
-        SafariBattle.throwBall();
-        break;
       case ActionType.MOVE:
         Safari.move(action.direction);
         Safari.stop(action.direction);
+        break;
+      case ActionType.RUN:
+        SafariBattle.run();
+        break;
+      case ActionType.THROW_BALL:
+        SafariBattle.throwBall();
         break;
     }
   }
@@ -306,6 +318,8 @@ const safari = (() => {
       case ActionType.MOVE:
         // re-evaluate after the movement is expected to finish
         scheduleAction(session, runAction, Safari.moveSpeed);
+        break;
+      case ActionType.RUN:
         break;
       case ActionType.THROW_BALL:
         break;

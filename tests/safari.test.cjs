@@ -64,6 +64,7 @@ function createGlobals({
   shinyBonus = 1,
   enabled = true,
   options = {},
+  ownedPokemons = {},
   town = { content: [] },
   gameState = GameConstants.GameState.town,
   battleModalState = "hidden",
@@ -85,7 +86,7 @@ function createGlobals({
   const itemGrid = ko.observableArray(items);
   const activeRegion = ko.observable(region);
   const safariModal = ko.observable(safariModalState);
-  const calls = { move: [], stop: [], throwBall: [], openModal: 0, pay: 0 };
+  const calls = { move: [], stop: [], throwBall: [], run: [], openModal: 0, pay: 0 };
   const townValue = ko.observable(town);
   const gameStateValue = ko.observable(gameState);
   const { $, element } = createElements();
@@ -137,10 +138,15 @@ function createGlobals({
     get enemy() { return enemy; },
     set enemy(value) { enemy = value; },
     throwBall() { calls.throwBall.push(true); },
+    run() { calls.run.push(true); },
   };
   const App = {
     game: {
       multiplier: { getBonus: () => shinyBonus },
+      party: {
+        alreadyCaughtPokemonByName: (name) => Object.hasOwn(ownedPokemons, name),
+        getPokemonByName: (name) => ownedPokemons[name],
+      },
       get gameState() { return gameStateValue(); },
       set gameState(value) { gameStateValue(value); },
     },
@@ -273,10 +279,27 @@ test("prioritizes rare visible Pokémon over distance and Pokémon over items", 
   });
   const automation = loadSafari(t, globals);
   const state = createState(automation, globals);
+
   assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "right" }));
   globals.optionValues.followVisiblePokemon(false);
   automation.updateState(state);
   assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "left" }));
+});
+test("filters visible Pokemon by catch priority", (t) => {
+  const globals = createGlobals({
+    grid: [[GameConstants.SafariTile.grass, GameConstants.SafariTile.grass, GameConstants.SafariTile.grass, GameConstants.SafariTile.grass]],
+    position: { x: 2, y: 0 },
+    pokemons: [pokemon("Resistant", 1, 0), pokemon("Contagious", 3, 0)],
+    options: { collectVisibleItems: false },
+    ownedPokemons: {
+      Resistant: { pokerus: GameConstants.Pokerus.Resistant },
+      Contagious: { pokerus: GameConstants.Pokerus.Contagious },
+    },
+  });
+  const automation = loadSafari(t, globals);
+  const state = createState(automation, globals);
+
+  assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "right" }));
 });
 
 test("normalizes environment weights and applies shiny multiplier", (t) => {
@@ -323,6 +346,25 @@ test("executes exactly one official operation per action", (t) => {
   assert.deepEqual(globals.calls.move, ["left"]);
   assert.deepEqual(globals.calls.stop, ["left"]);
   assert.deepEqual(globals.calls.throwBall, [true]);
+});
+
+test("runs from a Pokemon that should not be caught", (t) => {
+  const globals = createGlobals({
+    inProgress: true,
+    inBattle: true,
+    balls: 2,
+    battleModalState: "show",
+    ownedPokemons: {
+      Resistant: { pokerus: GameConstants.Pokerus.Resistant },
+    },
+  });
+  globals.SafariBattle.enemy = pokemon("Resistant", 0, 0);
+  const automation = loadSafari(t, globals);
+  automation.automate();
+  globals.runTimer();
+
+  assert.deepEqual(globals.calls.run, [true]);
+  assert.deepEqual(globals.calls.throwBall, []);
 });
 
 test("active runner defers movement and waits for modal readiness, busy state, and balls", (t) => {
