@@ -34,6 +34,16 @@ function _runAndSubscribe(observable, action) {
   return observable.subscribe(action);
 }
 
+function _shouldCatchPokemon(pokemon) {
+  const caught = App.game.party.alreadyCaughtPokemonByName(pokemon.name);
+  const pokerus = caught ? App.game.party.getPokemonByName(pokemon.name).pokerus : GameConstants.Pokerus.Uninfected;
+  return _or([
+    !caught,
+    pokemon.shiny,
+    pokerus === GameConstants.Pokerus.Contagious,
+  ]);
+}
+
 function _whenReady(computed, action) {
   return _runAndSubscribe(computed, (ready) => {
     if (ready) {
