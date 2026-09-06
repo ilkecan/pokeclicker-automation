@@ -11,6 +11,7 @@
 // @require     hatchery.js
 // @require     items.js
 // @require     quests.js
+// @require     safari.js
 // @require     shop.js
 // @require     underground.js
 // @require     settings/definitions.js
@@ -36,6 +37,7 @@ GameLoadState.onLoadState(GameLoadState.states.running, () => {
     hatchery,
     items,
     quests,
+    safari,
     shop,
     underground,
   ].forEach((module) => module.automate());
