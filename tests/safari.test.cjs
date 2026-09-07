@@ -6,6 +6,15 @@ const { createHarness } = require("./lib/harness.cjs");
 
 const constantsHarness = createHarness();
 const { GameConstants } = constantsHarness.game;
+const BaitType = { Bait: 0, Razz: 1, Pinap: 2, Nanab: 3 };
+const BaitList = {
+  Bait: { type: BaitType.Bait },
+  Razz: { type: BaitType.Razz },
+  Pinap: { type: BaitType.Pinap },
+  Nanab: { type: BaitType.Nanab },
+};
+const BerryType = { Razz: 0, Nanab: 1 };
+const OakItemType = { Magic_Ball: "magicBall" };
 const REGION = GameConstants.Region.kanto;
 
 function createElements() {
@@ -70,6 +79,8 @@ function createGlobals({
   battleModalState = "hidden",
   safariModalState = "show",
   region = REGION,
+  razz = 0,
+  nanab = 0,
 } = {}) {
   const { ko } = constantsHarness.game;
   const sectionEnabled = ko.observable(enabled);
@@ -86,13 +97,28 @@ function createGlobals({
   const itemGrid = ko.observableArray(items);
   const activeRegion = ko.observable(region);
   const safariModal = ko.observable(safariModalState);
-  const calls = { move: [], stop: [], throwBall: [], run: [], openModal: 0, pay: 0 };
+  const berryInventory = {
+    [BerryType.Razz]: ko.observable(razz),
+    [BerryType.Nanab]: ko.observable(nanab),
+  };
+  const calls = {
+    move: [],
+    stop: [],
+    throwBall: [],
+    throwRock: [],
+    throwBait: [],
+    selectedBait: [],
+    run: [],
+    openModal: 0,
+    pay: 0,
+  };
   const townValue = ko.observable(town);
   const gameStateValue = ko.observable(gameState);
   const { $, element } = createElements();
   if (safariModalState === "show") {
     element("#safariModal").addClass("show");
   }
+  const selectedBait = ko.observable(BaitList.Bait);
   if (battleModalState === "show") {
     element("#safariBattleModal").addClass("show");
   }
@@ -135,14 +161,22 @@ function createGlobals({
   };
   const SafariBattle = {
     busy: battleBusy,
+    selectedBait(value) {
+      if (arguments.length) calls.selectedBait.push(value);
+      return selectedBait(value);
+    },
     get enemy() { return enemy; },
     set enemy(value) { enemy = value; },
     throwBall() { calls.throwBall.push(true); },
+    throwRock() { calls.throwRock.push(true); },
+    throwBait() { calls.throwBait.push(true); },
     run() { calls.run.push(true); },
   };
   const App = {
     game: {
       multiplier: { getBonus: () => shinyBonus },
+      oakItems: { calculateBonus: () => 0 },
+      farming: { berryInventory },
       party: {
         alreadyCaughtPokemonByName: (name) => Object.hasOwn(ownedPokemons, name),
         getPokemonByName: (name) => ownedPokemons[name],
@@ -165,6 +199,7 @@ function createGlobals({
   const SafariPokemonList = { list: { [region]: ko.observable(encounters) } };
   const context = {
     $, App, AutomationSettings: settings, Safari, SafariBattle, SafariPokemonList, player,
+    BaitType, BaitList, BerryType, OakItemType,
     DisplayObservables: {
       modalState: {
         get safariModal() { return safariModal(); },
@@ -232,8 +267,21 @@ function encounter(name, weight, environment, available = true) {
   return { name, weight, environments: [environment], isAvailable: () => available };
 }
 
-function pokemon(name, x, y, shiny = false) {
-  return { name, x, y, shiny, get steps() { throw new Error("steps must not be read"); } };
+function pokemon(name, x, y, shiny = false, overrides = {}) {
+  return {
+    name,
+    x,
+    y,
+    shiny,
+    baseCatchFactor: 50,
+    baseEscapeFactor: 30,
+    levelModifier: 0,
+    angry: 0,
+    eating: 0,
+    eatingBait: BaitType.Bait,
+    ...overrides,
+    get steps() { throw new Error("steps must not be read"); },
+  };
 }
 
 function item(x, y) {
@@ -346,6 +394,102 @@ test("executes exactly one official operation per action", (t) => {
   assert.deepEqual(globals.calls.move, ["left"]);
   assert.deepEqual(globals.calls.stop, ["left"]);
   assert.deepEqual(globals.calls.throwBall, [true]);
+});
+
+test("executes official rock and bait operations without restoring bait selection", (t) => {
+  const globals = createGlobals();
+  const automation = loadSafari(t, globals);
+  automation.executeAction({ type: "throwRock" });
+  automation.executeAction({ type: "throwBait", bait: BaitType.Nanab });
+
+  assert.deepEqual(globals.calls.throwRock, [true]);
+  assert.deepEqual(globals.calls.throwBait, [true]);
+  assert.deepEqual(globals.calls.selectedBait, [BaitList.Nanab]);
+});
+
+test("optimizes normal encounters with basic bait only", (t) => {
+  const globals = createGlobals({
+    inBattle: true,
+    balls: 10,
+    battleModalState: "show",
+  });
+  globals.SafariBattle.enemy = pokemon("Normal", 0, 0, false, {
+    baseCatchFactor: 10,
+    baseEscapeFactor: 90,
+  });
+  const automation = loadSafari(t, globals);
+  const state = createState(automation, globals);
+
+  assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "throwBait", bait: BaitType.Bait }));
+});
+
+test("optimizes shiny berry choice from current state", (t) => {
+  const globals = createGlobals({
+    inBattle: true,
+    balls: 4,
+    razz: 1,
+    nanab: 1,
+    battleModalState: "show",
+  });
+  globals.SafariBattle.enemy = pokemon("Shiny", 0, 0, true, {
+    baseCatchFactor: 10,
+    baseEscapeFactor: 70,
+  });
+  const automation = loadSafari(t, globals);
+  const state = createState(automation, globals);
+
+  const action = automation.chooseAction(state);
+  assert.equal(action.type, "throwBait");
+  assert.ok([BaitType.Razz, BaitType.Nanab].includes(action.bait));
+  assert.equal(action.bait, BaitType.Razz);
+  const highEscapeGlobals = createGlobals({
+    inBattle: true,
+    balls: 30,
+    razz: 1,
+    nanab: 1,
+    battleModalState: "show",
+  });
+  highEscapeGlobals.SafariBattle.enemy = pokemon("Shiny", 0, 0, true, {
+    baseCatchFactor: 0.1,
+    baseEscapeFactor: 99,
+  });
+  const highEscapeAutomation = loadSafari(t, highEscapeGlobals);
+  const highEscapeState = createState(highEscapeAutomation, highEscapeGlobals);
+  assert.equal(highEscapeAutomation.chooseAction(highEscapeState).bait, BaitType.Nanab);
+});
+
+test("keeps a persistent Razz bonus instead of re-baiting basic", (t) => {
+  const globals = createGlobals({
+    inBattle: true,
+    balls: 10,
+    battleModalState: "show",
+  });
+  globals.SafariBattle.enemy = pokemon("Shiny", 0, 0, true, {
+    baseCatchFactor: 18,
+    baseEscapeFactor: 30,
+    eating: 0,
+    eatingBait: BaitType.Razz,
+  });
+  const automation = loadSafari(t, globals);
+  const state = createState(automation, globals);
+
+  assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "throwBall" }));
+});
+
+test("rocks with one ball left while eating and balls otherwise", (t) => {
+  const globals = createGlobals({
+    inBattle: true,
+    balls: 1,
+    battleModalState: "show",
+  });
+  globals.SafariBattle.enemy = pokemon("Normal", 0, 0, false, { eating: 2 });
+  const automation = loadSafari(t, globals);
+  const state = createState(automation, globals);
+
+  assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "throwRock" }));
+  globals.SafariBattle.enemy = pokemon("Normal", 0, 0, false);
+  automation.updateState(state);
+  assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "throwBall" }));
 });
 
 test("runs from a Pokemon that should not be caught", (t) => {

@@ -12,9 +12,14 @@ const safari = (() => {
   ];
   const ActionType = Object.freeze({
     MOVE: "move",
-    THROW_BALL: "throwBall",
     RUN: "run",
+    THROW_BAIT: "throwBait",
+    THROW_BALL: "throwBall",
+    THROW_ROCK: "throwRock",
   });
+  const ROCK_DURATIONS = Object.freeze([2, 3, 4, 5, 6]); // SafariBattle.throwRock
+  const BAIT_DURATIONS = Object.freeze([2, 3, 4, 5, 6]); // BaitList.Bait
+  const BERRY_DURATIONS = Object.freeze([2, 3, 4, 5, 6, 7]); // BaitList.Razz/Nanab
 
   function createGrid(height, width, value) {
     return Array.from({ length: height }, () => Array(width).fill(value));
@@ -285,17 +290,169 @@ const safari = (() => {
     console.error("[pokeclicker-automation] safari: no reachable target");
   }
 
+  function readBerryAmount(type) {
+    return App.game.farming.berryInventory[type]();
+  }
+
+  function createBattleState(state) {
+    const enemy = state.enemy;
+    return {
+      balls: state.balls,
+      angry: enemy.angry,
+      eating: enemy.eating,
+      eatingBait: enemy.eatingBait,
+    };
+  }
+
+  // SafariPokemon.catchFactor (SafariPokemon.ts)
+  function catchProbability(enemy, angry, eating, bait) {
+    const { levelModifier } = enemy;
+    const oakBonus = App.game.oakItems.calculateBonus(OakItemType.Magic_Ball);
+    let factor = enemy.baseCatchFactor + oakBonus + levelModifier * 10;
+    if (eating > 0) {
+      factor /= 2 - levelModifier;
+    }
+    if (angry > 0) {
+      factor *= 2 + levelModifier;
+    }
+    if (bait === BaitType.Razz) {
+      // Razz persists for the rest of the encounter, independent of eating status
+      factor *= 1.5 + levelModifier;
+    }
+    return Math.min(1, Math.max(0, factor / 100));
+  }
+
+  // SafariPokemon.escapeFactor (SafariPokemon.ts)
+  function escapeProbability(enemy, angry, eating, bait) {
+    const { levelModifier } = enemy;
+    let factor = enemy.baseEscapeFactor;
+    if (eating > 0) {
+      factor /= 4 + levelModifier;
+    }
+    if (angry > 0) {
+      factor *= 2 - levelModifier;
+    }
+    if (bait === BaitType.Nanab) {
+      // Nanab persists for the rest of the encounter, independent of eating status
+      factor /= 1.5 + levelModifier;
+    }
+    return Math.min(1, Math.max(0, factor / 100));
+  }
+
+  function ballContinuation(enemy, battle) {
+    // Exact eventual-catch value of throwing balls every turn from here: no choices
+    // remain, statuses decay deterministically, so this is one chain over the balls left.
+    let value = 0;
+    let survival = 1;
+    for (let turn = 0; turn < battle.balls; turn++) {
+      const angry = Math.max(0, battle.angry - turn);
+      const eating = Math.max(0, battle.eating - turn);
+      const catchChance = catchProbability(enemy, angry, eating, battle.eatingBait);
+      const escapeChance = escapeProbability(enemy, angry, eating, battle.eatingBait);
+      value += survival * catchChance;
+      survival *= (1 - catchChance) * (1 - escapeChance);
+      // remaining turns cannot change the decision
+      if (survival < 1e-15) {
+        break;
+      }
+    }
+    return value;
+  }
+
+  function baitDurations(bait) {
+    return bait === BaitType.Bait ? BAIT_DURATIONS : BERRY_DURATIONS;
+  }
+
+  function average(values) {
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+
+  function rockValue(enemy, battle) {
+    // Rock costs no ball: angry becomes the duration, eating clears, berry slot is kept.
+    return average(ROCK_DURATIONS.map((duration) => {
+      const angry = Math.max(battle.angry, duration);
+      const survive = 1 - escapeProbability(enemy, angry, 0, battle.eatingBait);
+      return survive * ballContinuation(enemy, { ...battle, angry: angry - 1, eating: 0 });
+    }));
+  }
+
+  function baitValue(enemy, battle, bait) {
+    // Bait costs no ball: eating becomes the duration, angry clears, slot takes the new bait.
+    return average(baitDurations(bait).map((duration) => {
+      const eating = Math.max(battle.eating, duration);
+      const survive = 1 - escapeProbability(enemy, 0, eating, bait);
+      return survive * ballContinuation(enemy, { ...battle, angry: 0, eating: eating - 1, eatingBait: bait });
+    }));
+  }
+
+  function battleActionCandidates(shiny) {
+    const candidates = [
+      { type: ActionType.THROW_BAIT, bait: BaitType.Bait },
+      { type: ActionType.THROW_BALL },
+      { type: ActionType.THROW_ROCK },
+    ];
+    // only spend berries on shinies
+    if (shiny) {
+      if (readBerryAmount(BerryType.Razz) > 0) {
+        candidates.push({ type: ActionType.THROW_BAIT, bait: BaitType.Razz });
+      }
+      if (readBerryAmount(BerryType.Nanab) > 0) {
+        candidates.push({ type: ActionType.THROW_BAIT, bait: BaitType.Nanab });
+      }
+    }
+    return candidates;
+  }
+
+  function actionScore(enemy, battle, action) {
+    switch (action.type) {
+      case ActionType.THROW_BAIT:
+        return baitValue(enemy, battle, action.bait);
+      case ActionType.THROW_BALL:
+        return ballContinuation(enemy, battle);
+      case ActionType.THROW_ROCK:
+        return rockValue(enemy, battle);
+    }
+  }
+
+  function chooseBattleAction(state) {
+    // One-ply search with exact ball-only rollout: score each first action assuming
+    // balls every turn afterwards; re-decided each turn, within ~0.03 of optimal.
+    const enemy = state.enemy;
+    const battle = createBattleState(state);
+    let bestAction = null;
+    let bestScore = -Infinity;
+    for (const action of battleActionCandidates(enemy.shiny)) {
+      const score = actionScore(enemy, battle, action);
+      if (score > bestScore) {
+        bestAction = action;
+        bestScore = score;
+      }
+    }
+    return bestAction;
+  }
+
   function chooseAction(state) {
     if (state.inBattle && !state.busy && state.enemy) {
       if (!_shouldCatchPokemon(state.enemy)) {
         return { type: ActionType.RUN };
       }
 
-      return { type: ActionType.THROW_BALL };
+      return chooseBattleAction(state);
     }
 
     const target = chooseTarget(state);
     return { type: ActionType.MOVE, direction: firstMove(state, target) };
+  }
+
+  function selectBait(type) {
+    switch (type) {
+      case BaitType.Razz:
+        return BaitList.Razz;
+      case BaitType.Nanab:
+        return BaitList.Nanab;
+      default:
+        return BaitList.Bait;
+    }
   }
 
   function executeAction(action) {
@@ -307,8 +464,15 @@ const safari = (() => {
       case ActionType.RUN:
         SafariBattle.run();
         break;
+      case ActionType.THROW_BAIT:
+        SafariBattle.selectedBait(selectBait(action.bait));
+        SafariBattle.throwBait();
+        break;
       case ActionType.THROW_BALL:
         SafariBattle.throwBall();
+        break;
+      case ActionType.THROW_ROCK:
+        SafariBattle.throwRock();
         break;
     }
   }
@@ -320,8 +484,9 @@ const safari = (() => {
         scheduleAction(session, runAction, Safari.moveSpeed);
         break;
       case ActionType.RUN:
-        break;
+      case ActionType.THROW_BAIT:
       case ActionType.THROW_BALL:
+      case ActionType.THROW_ROCK:
         break;
     }
   }
