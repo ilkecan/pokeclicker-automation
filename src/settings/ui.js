@@ -34,13 +34,16 @@ function installAutomationSettingsTab() {
     return;
   }
 
+  tabs.querySelector(".nav-link.active").classList.remove("active");
+  tabContent.querySelector(".tab-pane.active").classList.remove("active");
+
   const tabItem = document.createElement("li");
   tabItem.className = "nav-item";
-  tabItem.innerHTML = `<a class="nav-link" href="#${tabId}" data-toggle="tab">Automation</a>`;
+  tabItem.innerHTML = `<a class="nav-link active" href="#${tabId}" data-toggle="tab">Automation</a>`;
   tabs.appendChild(tabItem);
 
   const tabPane = document.createElement("div");
-  tabPane.className = "tab-pane";
+  tabPane.className = "tab-pane active";
   tabPane.id = tabId;
   tabPane.innerHTML = `
     <p class="m-2 text-muted">
