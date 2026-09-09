@@ -124,10 +124,9 @@ setImmediate(() => {
       }
     });
 
-    window.webContents.on('console-message', (event) => {
-      console.log('[pokeclicker-automation] inject: page console event', event);
-      const method = event.level === 'warning' ? 'warn' : event.level;
-      console[method](`[pokeclicker-automation] inject: page console: ${event.message} (${event.sourceId}:${event.lineNumber})`);
+    window.webContents.on('console-message', (details) => {
+      const method = details.level === 'warning' ? 'warn' : details.level;
+      console[method](`[pokeclicker-automation] inject: page console: ${details.message} (${details.sourceId}:${details.lineNumber})`);
     });
   });
 });
