@@ -1,5 +1,5 @@
 // Safari: stateless single-species scarcity scoring, exact ball-only Q/turn chains,
-// stock-only berries, shiny-first catch-max, and the unchanged movement/runner contract.
+// stock-only berries, shiny-first catch-max, encounter-tile routing, and runner lifecycle.
 "use strict";
 
 const assert = require("node:assert/strict");
@@ -1019,4 +1019,21 @@ test("c=1 skips berries on commons and invests in bottlenecks with separated fli
       .map(({ value, turns }) => K * value - turns).sort((a, b) => b - a);
     assert.ok(Math.abs(scores[0] - scores[1] - margin) < 1e-9);
   }
+});
+
+test("patrols water encounter tiles when the Safari has no grass", (t) => {
+  const globals = createGlobals({
+    region: GameConstants.Region.alola,
+    grid: [[GameConstants.SafariTile.ground, GameConstants.SafariTile.waterC, GameConstants.SafariTile.waterC]],
+    inProgress: true,
+  });
+  const automation = loadSafari(t, globals);
+  automation.automate();
+  globals.runTimer();
+  globals.Safari.playerXY.x = 1;
+  globals.runTimer();
+  globals.Safari.playerXY.x = 2;
+  globals.runTimer();
+  assert.deepEqual(globals.calls.move, ["right", "right", "left"]);
+  globals.sectionEnabled(false);
 });

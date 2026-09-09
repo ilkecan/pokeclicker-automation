@@ -238,7 +238,7 @@ const safari = (() => {
     return bestCandidate(itemCandidates(state), compareDistance);
   }
 
-  function* grassCandidates(state) {
+  function* encounterTileCandidates(state) {
     for (let y = 0; y < state.height; y++) {
       for (let x = 0; x < state.grid[y].length; x++) {
         if (x === state.position.x && y === state.position.y) {
@@ -246,8 +246,8 @@ const safari = (() => {
           continue;
         }
 
-        if (state.grid[y][x] !== GameConstants.SafariTile.grass) {
-          // only consider grass tiles for now
+        const tile = state.grid[y][x];
+        if (tile !== GameConstants.SafariTile.grass && !GameConstants.SAFARI_WATER_BLOCKS.includes(tile)) {
           continue;
         }
 
@@ -263,8 +263,8 @@ const safari = (() => {
     }
   }
 
-  function bestGrass(state) {
-    return bestCandidate(grassCandidates(state), compareDistance);
+  function bestEncounterTile(state) {
+    return bestCandidate(encounterTileCandidates(state), compareDistance);
   }
 
   function chooseTarget(state) {
@@ -282,9 +282,9 @@ const safari = (() => {
       }
     }
 
-    const grass = bestGrass(state);
-    if (grass) {
-      return grass;
+    const tile = bestEncounterTile(state);
+    if (tile) {
+      return tile;
     }
 
     console.error("[pokeclicker-automation] safari: no reachable target");
