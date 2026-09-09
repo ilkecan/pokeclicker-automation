@@ -327,8 +327,8 @@ function createRuntime(options = {}) {
       },
     });
     automationModule = evaluateScope(automationPath, ['dungeon']).dungeon;
-    if (typeof automationModule?.completeDungeonMap !== 'function') {
-      throw new Error('[pokeclicker-automation] dungeon-runtime: Automation source does not export dungeon.completeDungeonMap');
+    if (typeof automationModule?.completeMap !== 'function') {
+      throw new Error('[pokeclicker-automation] dungeon-runtime: Automation source does not export dungeon.completeMap');
     }
     return { app, player, battleAdapter };
   }
@@ -399,7 +399,7 @@ function createRuntime(options = {}) {
     const initialHash = mapHash(map);
     resetRunner(map, fixture);
     const startedVirtualTime = clock.now;
-    const subscriptions = measure('setup', () => automationModule.completeDungeonMap(map));
+    const subscriptions = measure('setup', () => automationModule.completeMap(map));
     automationSubscriptions.push(...subscriptions);
     flushTasks();
 
