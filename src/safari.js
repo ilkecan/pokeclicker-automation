@@ -268,17 +268,17 @@ const safari = (() => {
   }
 
   function chooseTarget(state) {
-    if (state.options.followVisiblePokemon) {
-      const pokemon = bestPokemon(state);
-      if (pokemon) {
-        return pokemon;
-      }
-    }
-
     if (state.options.collectVisibleItems) {
       const item = bestItem(state);
       if (item) {
         return item;
+      }
+    }
+
+    if (state.options.followVisiblePokemon) {
+      const pokemon = bestPokemon(state);
+      if (pokemon) {
+        return pokemon;
       }
     }
 
