@@ -84,3 +84,14 @@ test("numeric writes persist", (t) => {
   assert.equal(loaded.settings.getValue("shop", "targetPokeball"), 12);
   assert.match(loaded.storage.value, /"targetPokeball":12/);
 });
+
+test("unknown persisted sections are ignored", (t) => {
+  const loaded = loadSettings(t, JSON.stringify({
+    version: 1,
+    settings: {
+      shop: { enabled: true, targetPokeball: 5 },
+      futureSection: { foo: 1 },
+    },
+  }));
+  assert.equal(loaded.settings.getValue("shop", "targetPokeball"), 5);
+});
