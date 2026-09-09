@@ -332,7 +332,7 @@ test("builds reusable BFS routes around obstacles and omits unreachable targets"
   assert.equal(state.predecessors, predecessors);
 });
 
-test("prioritizes rare visible Pokémon over distance and Pokémon over items", (t) => {
+test("prioritizes visible items over Pokémon and rare Pokémon over distance", (t) => {
   const grid = [Array(5).fill(GameConstants.SafariTile.grass)];
   const globals = createGlobals({
     grid,
@@ -347,10 +347,10 @@ test("prioritizes rare visible Pokémon over distance and Pokémon over items", 
   const automation = loadSafari(t, globals);
   const state = createState(automation, globals);
 
-  assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "right" }));
-  globals.optionValues.followVisiblePokemon(false);
-  automation.updateState(state);
   assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "left" }));
+  globals.optionValues.collectVisibleItems(false);
+  automation.updateState(state);
+  assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "right" }));
 });
 test("filters visible Pokemon by catch priority", (t) => {
   const globals = createGlobals({
