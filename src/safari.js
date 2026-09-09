@@ -734,16 +734,20 @@ const safari = (() => {
       Safari.canPay(),
     ]));
 
+    const enter = () => {
+      disposeEventHandler();
+      Safari.payEntranceFee();
+    };
+    const disposeEventHandler = () => SAFARI_MODAL.off("shown.bs.modal", enter);
     const subscription = _whenReady(ready, () => {
-      const enter = () => {
-        SAFARI_MODAL.off("shown.bs.modal", enter);
-        Safari.payEntranceFee();
-      };
       SAFARI_MODAL.on("shown.bs.modal", enter);
       Safari.openModal();
     });
 
-    return [subscription];
+    return [
+      subscription,
+      { dispose: disposeEventHandler },
+    ];
   }
 
   function automate() {
