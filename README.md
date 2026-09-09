@@ -25,4 +25,4 @@ just --list
 Performance simulators live in [`simulators/`](simulators/). They run automation against official game code so policy changes can be compared on reproducible inputs.
 
 ### Tests
-Tests live in live in [`tests/`](tests/). They use Node's built-in test runner and execute automation against an official PokéClicker checkout.
+Tests live in [`tests/`](tests/). They use Node's built-in test runner, isolated script contexts, and an official PokéClicker checkout.
