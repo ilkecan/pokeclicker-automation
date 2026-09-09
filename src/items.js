@@ -3,8 +3,25 @@
 const items = (() => {
   const SETTINGS_SECTION = "items";
 
-  function chooseHeldItem(_pokemon) {
-    return ItemList.Wonder_Chest;
+  function chooseHeldItem(pokemon) {
+    const item = ItemList.Wonder_Chest;
+    if (!item.canUse(pokemon)) {
+      return null;
+    }
+
+    return item;
+  }
+
+  function canGiveItem(item) {
+    if (item === null) {
+      return false;
+    }
+
+    if (player.amountOfItem(item.name) <= 0) {
+      return false;
+    }
+
+    return true;
   }
 
   function pokemonsWithoutHeldItem() {
@@ -26,13 +43,17 @@ const items = (() => {
 
       return pokemons().some((pokemon) => {
         const item = chooseHeldItem(pokemon);
-        return player.amountOfItem(item.name) > 0 && item.canUse(pokemon);
+        return canGiveItem(item);
       });
     });
 
     const subscription = _whenReady(canGiveHeldItem, function() {
       for (const pokemon of pokemons()) {
         const item = chooseHeldItem(pokemon);
+        if (!canGiveItem(item)) {
+          continue;
+        }
+
         pokemon.giveHeldItem(item);
       }
     });
