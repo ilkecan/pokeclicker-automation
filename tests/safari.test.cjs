@@ -1037,3 +1037,19 @@ test("patrols water encounter tiles when the Safari has no grass", (t) => {
   assert.deepEqual(globals.calls.move, ["right", "right", "left"]);
   globals.sectionEnabled(false);
 });
+
+test("cancels pending entrance payment when the section is disabled", (t) => {
+  class SafariTownContent {}
+  const globals = createGlobals({
+    town: { content: [new SafariTownContent()] },
+    safariModalState: "hidden",
+  });
+  globals.context.SafariTownContent = SafariTownContent;
+  const automation = loadSafari(t, globals);
+  automation.automate();
+  assert.equal(globals.calls.openModal, 1);
+  globals.sectionEnabled(false);
+  globals.element("#safariModal").trigger("shown.bs.modal");
+  assert.equal(globals.calls.pay, 0);
+  assert.equal(globals.progress(), false);
+});
