@@ -290,6 +290,10 @@ const safari = (() => {
     console.error("[pokeclicker-automation] safari: no reachable target");
   }
 
+  // Magic number pinned by sensitivity tests, not derived from step time.
+  // Lower makes commons take berries, higher makes rares skip setups.
+  const BATTLE_TURN_COST = 1;
+
   function readBerryAmount(type) {
     return App.game.farming.berryInventory[type]();
   }
@@ -340,15 +344,17 @@ const safari = (() => {
   }
 
   function ballContinuation(enemy, battle) {
-    // Exact eventual-catch value of throwing balls every turn from here: no choices
-    // remain, statuses decay deterministically, so this is one chain over the balls left.
+    // Ball-only chain to absorption: exact eventual-catch value of throwing balls
+    // every turn from here; no choices remain, statuses decay deterministically.
     let value = 0;
+    let turns = 0;
     let survival = 1;
     for (let turn = 0; turn < battle.balls; turn++) {
       const angry = Math.max(0, battle.angry - turn);
       const eating = Math.max(0, battle.eating - turn);
       const catchChance = catchProbability(enemy, angry, eating, battle.eatingBait);
       const escapeChance = escapeProbability(enemy, angry, eating, battle.eatingBait);
+      turns += survival;
       value += survival * catchChance;
       survival *= (1 - catchChance) * (1 - escapeChance);
       // remaining turns cannot change the decision
@@ -356,49 +362,65 @@ const safari = (() => {
         break;
       }
     }
-    return value;
+    return { value, turns };
   }
 
   function baitDurations(bait) {
     return bait === BaitType.Bait ? BAIT_DURATIONS : BERRY_DURATIONS;
   }
 
-  function average(values) {
-    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  function moveValue(enemy, battle, durations, setup) {
+    let totalValue = 0;
+    let totalTurns = 0;
+
+    for (const duration of durations) {
+      const { angry, eating, eatingBait } = setup(duration);
+      const survive = 1 - escapeProbability(enemy, angry, eating, eatingBait);
+      const continuation = ballContinuation(enemy, {
+        ...battle,
+        angry: Math.max(0, angry - 1),
+        eating: Math.max(0, eating - 1),
+        eatingBait,
+      });
+      totalValue += survive * continuation.value;
+      totalTurns += survive * continuation.turns;
+    }
+
+    const value = totalValue / durations.length;
+    // setup turn always happens
+    const turns = 1 + totalTurns / durations.length;
+    return { value, turns };
   }
 
   function rockValue(enemy, battle) {
-    // Rock costs no ball: angry becomes the duration, eating clears, berry slot is kept.
-    return average(ROCK_DURATIONS.map((duration) => {
-      const angry = Math.max(battle.angry, duration);
-      const survive = 1 - escapeProbability(enemy, angry, 0, battle.eatingBait);
-      return survive * ballContinuation(enemy, { ...battle, angry: angry - 1, eating: 0 });
+    // Rock costs no ball, refresh angry, clear eating and preserve the berry slot.
+    return moveValue(enemy, battle, ROCK_DURATIONS, (duration) => ({
+      angry: Math.max(battle.angry, duration),
+      eating: 0,
+      eatingBait: battle.eatingBait,
     }));
   }
 
   function baitValue(enemy, battle, bait) {
-    // Bait costs no ball: eating becomes the duration, angry clears, slot takes the new bait.
-    return average(baitDurations(bait).map((duration) => {
-      const eating = Math.max(battle.eating, duration);
-      const survive = 1 - escapeProbability(enemy, 0, eating, bait);
-      return survive * ballContinuation(enemy, { ...battle, angry: 0, eating: eating - 1, eatingBait: bait });
+    // Bait costs no ball, clear angry, refresh eating and replace the berry slot.
+    return moveValue(enemy, battle, baitDurations(bait), (duration) => ({
+      angry: 0,
+      eating: Math.max(battle.eating, duration),
+      eatingBait: bait,
     }));
   }
 
-  function battleActionCandidates(shiny) {
+  function battleActionCandidates() {
     const candidates = [
       { type: ActionType.THROW_BAIT, bait: BaitType.Bait },
       { type: ActionType.THROW_BALL },
       { type: ActionType.THROW_ROCK },
     ];
-    // only spend berries on shinies
-    if (shiny) {
-      if (readBerryAmount(BerryType.Razz) > 0) {
-        candidates.push({ type: ActionType.THROW_BAIT, bait: BaitType.Razz });
-      }
-      if (readBerryAmount(BerryType.Nanab) > 0) {
-        candidates.push({ type: ActionType.THROW_BAIT, bait: BaitType.Nanab });
-      }
+    if (readBerryAmount(BerryType.Razz) > 0) {
+      candidates.push({ type: ActionType.THROW_BAIT, bait: BaitType.Razz });
+    }
+    if (readBerryAmount(BerryType.Nanab) > 0) {
+      candidates.push({ type: ActionType.THROW_BAIT, bait: BaitType.Nanab });
     }
     return candidates;
   }
@@ -414,18 +436,76 @@ const safari = (() => {
     }
   }
 
+  function progressValue(enemy) {
+    const pokemon = App.game.party.getPokemonByName(enemy.name);
+    // initial catch
+    if (!pokemon) {
+      return 1;
+    }
+
+    if (pokemon.pokerus !== GameConstants.Pokerus.Contagious) {
+      // either uninfected, infected (still in hatchery) or already resisted
+      return 0;
+    }
+
+    // gain EV for contagious pokemon
+    return 1;
+  }
+
+  function battleWeight(state, progress) {
+    const environment = Safari.activeEnvironment();
+    let summary;
+    switch (environment) {
+      case SafariEnvironments.Grass:
+        summary = state.weights.grass;
+        break;
+      case SafariEnvironments.Water:
+        summary = state.weights.water;
+        break;
+      default:
+        console.error("[pokeclicker-automation] safari: unknown active environment", environment);
+        break;
+    }
+    // Static current-environment spawn share: an approximation for pursued encounters.
+    const share = summary.weights.get(state.enemy.name) / summary.total;
+    // FIXED neutral eventual catch over 30 balls, using live enemy base factors
+    // (and the existing level/Oak modifiers), never the per-throw catch probability.
+    const baseline = ballContinuation(state.enemy, { balls: 30, angry: 0, eating: 0, eatingBait: BaitType.Bait }).value;
+    return progress / (share * baseline);
+  }
+
   function chooseBattleAction(state) {
-    // One-ply search with exact ball-only rollout: score each first action assuming
-    // balls every turn afterwards; re-decided each turn, within ~0.03 of optimal.
-    const enemy = state.enemy;
+    const { enemy } = state;
+    let turnCost;
+    let weight;
+    if (enemy.shiny) {
+      // always catch-max shinies, since catching them has value
+      // (quest/achievement) apart from the EV gain
+      turnCost = 0;
+      weight = 1;
+    } else {
+      const progress = progressValue(enemy);
+      if (progress === 0) {
+        return { type: ActionType.RUN };
+      }
+
+      turnCost = BATTLE_TURN_COST;
+      weight = battleWeight(state, progress);
+    }
+
     const battle = createBattleState(state);
     let bestAction = null;
     let bestScore = -Infinity;
-    for (const action of battleActionCandidates(enemy.shiny)) {
-      const score = actionScore(enemy, battle, action);
-      if (score > bestScore) {
+    let bestTurns = Infinity;
+
+    // Try each first action once, then balls to the end; re-decide every turn (one-ply).
+    for (const action of battleActionCandidates()) {
+      const { value, turns } = actionScore(enemy, battle, action);
+      const score = weight * value - turnCost * turns;
+      if (score > bestScore || (score === bestScore && turns < bestTurns)) {
         bestAction = action;
         bestScore = score;
+        bestTurns = turns;
       }
     }
     return bestAction;
