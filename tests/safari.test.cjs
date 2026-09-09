@@ -5,9 +5,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { createHarness } = require("./lib/harness.cjs");
-const fs = require("node:fs");
-const path = require("node:path");
-const vm = require("node:vm");
 
 const constantsHarness = createHarness();
 const { GameConstants } = constantsHarness.game;
@@ -254,18 +251,6 @@ function loadSafari(t, globals) {
   return createHarness(t).loadAutomation("safari", globals.context).automation;
 }
 
-function loadBattle(t, globals) {
-  const harness = createHarness(t);
-  const context = vm.createContext({ console, ...harness.game, ...globals.context });
-  vm.runInContext(fs.readFileSync(path.join(harness.projectDir, "src/common.js"), "utf8"), context);
-  // Expose private battle functions only inside this VM; production exports stay unchanged.
-  const source = fs.readFileSync(path.join(harness.projectDir, "src/safari.js"), "utf8");
-  vm.runInContext(source.replace("    automate,", `    automate,
-    ballContinuation, catchProbability, escapeProbability, rockValue, baitValue,
-    battleActionCandidates, actionScore, progressValue, battleWeight, chooseBattleAction,`), context);
-  return vm.runInContext("safari", context);
-}
-
 function close(actual, expected) {
   assert.ok(Math.abs(actual - expected) < 1e-12, `${actual} != ${expected}`);
 }
@@ -488,7 +473,7 @@ test("optimizes shiny berry choice from current state", (t) => {
     baseCatchFactor: 0.1,
     baseEscapeFactor: 30,
   });
-  const lowCatchAutomation = loadBattle(t, lowCatchGlobals);
+  const lowCatchAutomation = loadSafari(t, lowCatchGlobals);
   const lowCatchState = createState(lowCatchAutomation, lowCatchGlobals);
   // SafariPokemon.ts:47 fixes escape at 30; Nanab won only in the old escape-99 fixture.
   close(lowCatchAutomation.baitValue(lowCatchState.enemy, neutral(), BaitType.Razz).value, 0.0056744122959760225);
@@ -730,7 +715,7 @@ test("auto-enter waits for the Safari modal to finish closing", (t) => {
 });
 
 test("ball chains count survival, terminal catches, final balls, and status decay", (t) => {
-  const automation = loadBattle(t, createGlobals());
+  const automation = loadSafari(t, createGlobals());
   const enemy = pokemon("Enemy", 0, 0, false, { baseCatchFactor: 10 });
   const two = automation.ballContinuation(enemy, neutral(2));
   close(two.value, 0.1 + 0.9 * 0.7 * 0.1);
@@ -753,7 +738,7 @@ test("ball chains count survival, terminal catches, final balls, and status deca
 });
 
 test("setup chains average game durations and charge their own turn", (t) => {
-  const automation = loadBattle(t, createGlobals());
+  const automation = loadSafari(t, createGlobals());
   const enemy = pokemon("Enemy", 0, 0, false, { baseCatchFactor: 10 });
   // Independent path enumeration: catch terminates before flee; flee before decay.
   function rollout(balls, angry, eating, bait) {
@@ -790,7 +775,7 @@ test("setup chains average game durations and charge their own turn", (t) => {
 });
 
 test("berries replace one persistent slot and rocks preserve it", (t) => {
-  const automation = loadBattle(t, createGlobals());
+  const automation = loadSafari(t, createGlobals());
   const enemy = pokemon("Enemy", 0, 0, false, { baseCatchFactor: 10 });
   const razz = { ...neutral(1), eatingBait: BaitType.Razz };
   const nanab = { ...neutral(1), eatingBait: BaitType.Nanab };
@@ -808,7 +793,7 @@ test("berries replace one persistent slot and rocks preserve it", (t) => {
 });
 
 test("short refresh rolls preserve longer status and clear the opposing status", (t) => {
-  const automation = loadBattle(t, createGlobals());
+  const automation = loadSafari(t, createGlobals());
   const enemy = pokemon("Enemy", 0, 0, false, { baseCatchFactor: 10 });
   // Eating 6 is reachable after a berry roll of 7; basic's rolls cannot shorten it.
   const refreshed = automation.baitValue(enemy, { ...neutral(6), eating: 6, eatingBait: BaitType.Razz }, BaitType.Bait);
@@ -839,7 +824,7 @@ test("unfinished mons deposit one full catch regardless of banked progress", (t)
   ]) {
     const member = owned(banked);
     const globals = createGlobals({ slowEVs, evBonus, ownedPokemons: { Enemy: member } });
-    const automation = loadBattle(t, globals);
+    const automation = loadSafari(t, globals);
     globals.App.game.challenges.list.slowEVs.active = () => assert.fail("threshold deposit needs no bonus reads");
     globals.App.game.multiplier.getBonus = () => assert.fail("threshold deposit needs no bonus reads");
     globals.App.game.party.calculateEffortPoints = () => assert.fail("per-mon yields are out of scope");
@@ -852,7 +837,7 @@ test("acquisition credits make 51 to 50 and 501 to 500 transitions despite zero 
   for (const slowEVs of [false, true]) {
     const members = {};
     const globals = createGlobals({ slowEVs, ownedPokemons: members });
-    const automation = loadBattle(t, globals);
+    const automation = loadSafari(t, globals);
     const enemy = pokemon("Enemy", 0, 0);
     const u = slowEVs ? 0.1 : 1;
     const catchesLeft = 50 / u;
@@ -877,7 +862,7 @@ test("acquisition credits make 51 to 50 and 501 to 500 transitions despite zero 
 test("shiny catch-max precedes EV and ownership reads, including unowned and Resistant", (t) => {
   for (const members of [{}, { Enemy: owned(50, GameConstants.Pokerus.Resistant) }]) {
     const globals = createGlobals({ razz: 1, nanab: 1, ownedPokemons: members });
-    const automation = loadBattle(t, globals);
+    const automation = loadSafari(t, globals);
     const enemy = pokemon("Enemy", 0, 0, true, { baseCatchFactor: 10 });
     const state = { enemy, balls: 4 };
     const unavailable = () => assert.fail("shiny scorer must run before progress/spawn reads");
@@ -889,7 +874,7 @@ test("shiny catch-max precedes EV and ownership reads, including unowned and Res
     assert.equal(automation.chooseBattleAction(state).bait, BaitType.Razz);
   }
   const globals = createGlobals();
-  const automation = loadBattle(t, globals);
+  const automation = loadSafari(t, globals);
   // A saturated, already-angry shiny is guaranteed on this ball; setup can lose it.
   const enemy = pokemon("Enemy", 0, 0, true, { baseCatchFactor: 42.5, levelModifier: 0.98, angry: 5 });
   assert.equal(automation.chooseBattleAction({ enemy, balls: 1 }).type, "throwBall");
@@ -898,7 +883,7 @@ test("shiny catch-max precedes EV and ownership reads, including unowned and Res
 test("zero-deposit owned encounters run but negative scores never summon RUN", (t) => {
   const members = { Enemy: owned(0, GameConstants.Pokerus.Uninfected) };
   const globals = createGlobals({ ownedPokemons: members, encounters: [encounter("Enemy", 1, 0)], razz: 1, nanab: 1 });
-  const automation = loadBattle(t, globals);
+  const automation = loadSafari(t, globals);
   globals.SafariBattle.enemy = pokemon("Enemy", 0, 0, false, { baseCatchFactor: 10 });
   const state = createState(automation, globals);
   assert.equal(automation.chooseBattleAction(state).type, "run");
@@ -917,7 +902,7 @@ test("zero-deposit owned encounters run but negative scores never summon RUN", (
 });
 
 test("one-ply rollout gaps are documented as probabilities, not pinned actions", (t) => {
-  const automation = loadBattle(t, createGlobals({ nanab: 1 }));
+  const automation = loadSafari(t, createGlobals({ nanab: 1 }));
   const enemy = pokemon("Enemy", 0, 0, false, { baseCatchFactor: 4 });
   const ball = automation.ballContinuation(enemy, neutral(1)).value;
   const nanabThenBalls = automation.baitValue(enemy, neutral(1), BaitType.Nanab).value;
@@ -935,7 +920,7 @@ test("K stays fixed across actions, statuses and balls, using only current-envir
     ownedPokemons: { Enemy: owned(0) },
     razz: 1, nanab: 1,
   });
-  const automation = loadBattle(t, globals);
+  const automation = loadSafari(t, globals);
   globals.SafariBattle.enemy = pokemon("Enemy", 0, 0, false, { baseCatchFactor: 10 });
   const state = createState(automation, globals);
   const q = 0.1 * (1 - 0.63 ** 30) / (1 - 0.63);
@@ -968,7 +953,7 @@ test("uncapped endgame progress never rescales the same fight or reads other spe
       ownedPokemons: members, razz: 1, nanab: 1,
       encounters: [encounter("Enemy", share * 100, 0), encounter("Other", 100 - share * 100, 0)],
     });
-    const automation = loadBattle(t, globals);
+    const automation = loadSafari(t, globals);
     globals.SafariBattle.enemy = pokemon("Enemy", 0, 0, false, { baseCatchFactor: 10 });
     const state = createState(automation, globals);
     globals.App.game.party.getPokemonByName = (name) => {
@@ -985,7 +970,7 @@ test("uncapped endgame progress never rescales the same fight or reads other spe
 
 test("stock is availability only and is re-read with live statuses", (t) => {
   const globals = createGlobals({ razz: 1, nanab: 1 });
-  const automation = loadBattle(t, globals);
+  const automation = loadSafari(t, globals);
   const enemy = pokemon("Enemy", 0, 0, true, { baseCatchFactor: 10 });
   const state = { enemy, balls: 4 };
   assert.equal(automation.chooseBattleAction(state).bait, BaitType.Razz);
@@ -1014,7 +999,7 @@ test("c=1 skips berries on commons and invests in bottlenecks with separated fli
       ownedPokemons: { [name]: owned(0) },
       encounters: [encounter(name, weight, environment), encounter("Background", total - weight, environment)],
     });
-    const automation = loadBattle(t, globals);
+    const automation = loadSafari(t, globals);
     globals.SafariBattle.enemy = pokemon(name, 0, 0, false, { baseCatchFactor: catchRate / 6 });
     const state = createState(automation, globals);
     const K = automation.battleWeight(state, automation.progressValue(state.enemy));
