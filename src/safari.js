@@ -754,10 +754,19 @@ const safari = (() => {
   }
 
   return {
+    actionScore,
     automate,
+    baitValue,
+    ballContinuation,
+    battleActionCandidates,
+    battleWeight,
     chooseAction,
+    chooseBattleAction,
     createWeights,
+    escapeProbability,
     executeAction,
+    progressValue,
+    rockValue,
     updateState,
   };
 })();
