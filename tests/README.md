@@ -1,6 +1,6 @@
 # Tests
 
-Tests validate automation behavior against official PokéClicker code rather than copied game rules.
+Tests execute automation in isolated script contexts using official PokéClicker code and constants where practical. Plain game-state fixtures cover modules, such as Safari, whose game classes cannot load in the Node harness.
 
 The shared test harness and its tests live in [`lib/`](lib/).
 
