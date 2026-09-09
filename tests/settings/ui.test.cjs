@@ -51,8 +51,12 @@ test("integer binding normalizes changes", (t) => {
 
 test("settings UI renders number and enum controls", (t) => {
   let pane;
-  const tabs = { appendChild() {} };
-  const tabContent = { appendChild: (element) => { pane = element; } };
+  let tab;
+  const removed = [];
+  const activeLink = { classList: { remove: (...args) => removed.push(["link", ...args]) } };
+  const activePane = { classList: { remove: (...args) => removed.push(["pane", ...args]) } };
+  const tabs = { appendChild: (element) => { tab = element; }, querySelector: () => activeLink };
+  const tabContent = { appendChild: (element) => { pane = element; }, querySelector: () => activePane };
   const settingsModal = {
     querySelector: (selector) => selector.includes("nav-tabs") ? tabs : tabContent,
   };
@@ -92,6 +96,8 @@ test("settings UI renders number and enum controls", (t) => {
   assert.match(pane.innerHTML, /min="0"/);
   assert.match(pane.innerHTML, /aria-label': label/);
   assert.match(pane.innerHTML, /automationNonNegativeInteger: value/);
-  assert.equal((pane.innerHTML.match(/<!-- ko /g) || []).length, 4);
   assert.equal((pane.innerHTML.match(/<!-- \/ko -->/g) || []).length, 4);
+  assert.match(tab.innerHTML, /nav-link active/);
+  assert.equal(pane.className, "tab-pane active");
+  assert.deepEqual(removed, [["link", "active"], ["pane", "active"]]);
 });
