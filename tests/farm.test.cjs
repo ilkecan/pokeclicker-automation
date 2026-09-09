@@ -21,14 +21,15 @@ function loadFarm(t, {
   apply = true,
   catching = false,
   fleeing = false,
-} = {}) {
+  locked = false,
+}= {}) {
   const events = [];
   const plotWanderer = ko.observable(wanderer);
   const plot = {
     index: 3,
     mulch,
     berry: BerryType.None,
-    isSafeLocked: false,
+    isSafeLocked: locked,
     _wanderer: plotWanderer,
     get wanderer() {
       return plotWanderer();
@@ -106,6 +107,9 @@ test("non-priority, already mulched, empty-inventory, and disabled cases catch i
   assert.deepEqual(run(t, { wanderer: { name: "Pikachu", shiny: true }, mulch: "other" }), [["catch", 3]]);
   assert.deepEqual(run(t, { wanderer: { name: "Pikachu", shiny: true }, inventory: false }), [["catch", 3]]);
   assert.deepEqual(run(t, { wanderer: { name: "Pikachu", shiny: true }, useGooey: false }), [["catch", 3]]);
+});
+test("safe-locked plots catch without attempting mulch", (t) => {
+  assert.deepEqual(run(t, { locked: true }), [["catch", 3]]);
 });
 
 test("failed mulch application logs once and still catches", (t) => {

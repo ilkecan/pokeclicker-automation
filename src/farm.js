@@ -9,6 +9,7 @@ const farm = (() => {
     const priority = _shouldCatchPokemon(wanderer);
 
     const shouldMulch = _and([
+      !plot.isSafeLocked,
       App.game.farming.hasMulch(gooey),
       AutomationSettings.getValue(SETTINGS_SECTION, "useGooeyMulch"),
       plot.mulch === MulchType.None,
@@ -47,7 +48,11 @@ const farm = (() => {
           return false;
         }
 
-        if (plot.berry === BerryType.None || plot.isSafeLocked || plot.stage() !== PlotStage.Berry) {
+        if (_or([
+          plot.berry === BerryType.None,
+          plot.isSafeLocked,
+          plot.stage() !== PlotStage.Berry,
+        ])) {
           return false;
         }
 
