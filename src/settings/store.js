@@ -145,15 +145,15 @@ const AutomationSettings = (() => {
     }
 
     for (const [sectionId, storedSection] of Object.entries(settings)) {
-      if (!isRecord(storedSection)) {
-        throw new Error(`[pokeclicker-automation] settings: stored section \`${sectionId}\` is not an object`);
-      }
-      validateValue(storedSection.enabled, "boolean", `${sectionId}.enabled`);
-
       const section = sectionsById.get(sectionId);
       if (!section) {
         continue;
       }
+
+      if (!isRecord(storedSection)) {
+        throw new Error(`[pokeclicker-automation] settings: stored section \`${sectionId}\` is not an object`);
+      }
+      validateValue(storedSection.enabled, "boolean", `${sectionId}.enabled`);
 
       for (const option of section.options) {
         if (Object.hasOwn(storedSection, option.id)) {
