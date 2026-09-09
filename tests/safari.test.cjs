@@ -523,7 +523,7 @@ test("runs from a Pokemon that should not be caught", (t) => {
     balls: 2,
     battleModalState: "show",
     ownedPokemons: {
-      Resistant: { pokerus: GameConstants.Pokerus.Resistant },
+      Resistant: owned(50, GameConstants.Pokerus.Resistant),
     },
   });
   globals.SafariBattle.enemy = pokemon("Resistant", 0, 0);
@@ -864,14 +864,14 @@ test("shiny catch-max precedes EV and ownership reads, including unowned and Res
     const globals = createGlobals({ razz: 1, nanab: 1, ownedPokemons: members });
     const automation = loadSafari(t, globals);
     const enemy = pokemon("Enemy", 0, 0, true, { baseCatchFactor: 10 });
-    const state = { enemy, balls: 4 };
-    const unavailable = () => assert.fail("shiny scorer must run before progress/spawn reads");
+    const state = { enemy, balls: 4, inBattle: true, busy: false };
+    const unavailable = () => assert.fail("shiny decisions must precede progress/spawn reads");
     globals.App.game.party.getPokemonByName = unavailable;
     globals.App.game.party.alreadyCaughtPokemonByName = unavailable;
     globals.App.game.challenges.list.slowEVs.active = unavailable;
     globals.App.game.multiplier.getBonus = unavailable;
     globals.Safari.activeEnvironment = unavailable;
-    assert.equal(automation.chooseBattleAction(state).bait, BaitType.Razz);
+    assert.equal(automation.chooseAction(state).bait, BaitType.Razz);
   }
   const globals = createGlobals();
   const automation = loadSafari(t, globals);

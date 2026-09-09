@@ -513,10 +513,6 @@ const safari = (() => {
 
   function chooseAction(state) {
     if (state.inBattle && !state.busy && state.enemy) {
-      if (!_shouldCatchPokemon(state.enemy)) {
-        return { type: ActionType.RUN };
-      }
-
       return chooseBattleAction(state);
     }
 
