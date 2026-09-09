@@ -85,7 +85,7 @@ async function testRuntimeSettings() {
   const automationPath = path.join(directory, 'automation.js');
   fs.writeFileSync(automationPath, `"use strict";
 const dungeon = (() => {
-  function completeDungeonMap() {
+  function completeMap() {
     if (!AutomationSettings.getValue("dungeon", "openAccessibleChests")) {
       throw new Error("openAccessibleChests was not applied");
     }
@@ -95,7 +95,7 @@ const dungeon = (() => {
     DungeonRunner.dungeonFinished(true);
     return [];
   }
-  return { completeDungeonMap };
+  return { completeMap };
 })();
 `);
   const runtime = createRuntime({ automationPath, gameDir: defaultGameDir(), seed: 99 });
