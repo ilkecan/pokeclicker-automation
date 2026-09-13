@@ -70,6 +70,7 @@ const settingsDefinitions = (() => {
       defaultValue: true,
       options: [
         { id: "followVisiblePokemon", label: "Follow visible Pokémon", type: "boolean", defaultValue: true },
+        { id: "followRarerVisiblePokemon", label: "Follow rarer visible Pokémon", type: "boolean", defaultValue: true },
         { id: "collectVisibleItems", label: "Collect visible items", type: "boolean", defaultValue: true },
         { id: "autoEnter", label: "Automatically enter Safari", type: "boolean", defaultValue: true },
       ],

@@ -2,6 +2,11 @@
 
 const safari = (() => {
   const SETTINGS_SECTION = "safari";
+  const OPTION_NAMES = Object.freeze([
+    "followVisiblePokemon",
+    "followRarerVisiblePokemon",
+    "collectVisibleItems",
+  ]);
   const SAFARI_MODAL = $("#safariModal");
   const SAFARI_BATTLE_MODAL = $("#safariBattleModal");
   const DIRECTIONS = [
@@ -30,6 +35,7 @@ const safari = (() => {
     const width = grid[0].length;
     const region = Safari.activeRegion();
     const weights = createWeights(region);
+    const chances = calculateChances(grid, weights, region);
     return {
       grid,
       width,
@@ -42,6 +48,7 @@ const safari = (() => {
       options: {
         followVisiblePokemon: false,
         collectVisibleItems: false,
+        followRarerVisiblePokemon: false,
       },
       pokemons: [],
       items: [],
@@ -49,7 +56,8 @@ const safari = (() => {
       predecessors: createGrid(height, width, null),
       weights,
       region,
-      chances: calculateChances(grid, weights, region),
+      chances,
+      medianChance: calculateMedianChance(chances, region),
     };
   }
 
@@ -150,6 +158,8 @@ const safari = (() => {
   }
 
   function updateState(state) {
+    const previousInBattle = state.inBattle;
+
     const point = Safari.playerXY;
     state.position.x = point.x;
     state.position.y = point.y;
@@ -157,10 +167,16 @@ const safari = (() => {
     state.busy = SafariBattle.busy();
     state.balls = Safari.balls();
     state.enemy = SafariBattle.enemy;
-    state.options.followVisiblePokemon = AutomationSettings.getValue(SETTINGS_SECTION, "followVisiblePokemon");
-    state.options.collectVisibleItems = AutomationSettings.getValue(SETTINGS_SECTION, "collectVisibleItems");
+    for (const name of OPTION_NAMES) {
+      state.options[name] = AutomationSettings.getValue(SETTINGS_SECTION, name);
+    }
     state.pokemons = Safari.pokemonGrid();
     state.items = Safari.itemGrid();
+
+    if (previousInBattle && !state.inBattle) {
+      state.medianChance = calculateMedianChance(state.chances, state.region);
+    }
+
     buildRoute(state);
   }
 
@@ -202,9 +218,17 @@ const safari = (() => {
   }
 
   function* pokemonCandidates(state) {
-    for (const pokemon of state.pokemons) {
+    const { chances, medianChance, options, pokemons } = state;
+
+    for (const pokemon of pokemons) {
       if (!_shouldCatchPokemon(pokemon)) {
         continue;
+      }
+
+      if (options.followRarerVisiblePokemon) {
+        if (chances.get(pokemon.name) >= medianChance) {
+          continue;
+        }
       }
 
       const distance = distanceTo(state, pokemon);
@@ -511,6 +535,28 @@ const safari = (() => {
     return rates;
   }
 
+  function calculateMedianChance(chances, region) {
+    const unfinished = new Set();
+    for (const encounter of SafariPokemonList.list[region]()) {
+      if (encounter.isAvailable() && _shouldCatchPokemon(encounter)) {
+        unfinished.add(encounter.name);
+      }
+    }
+
+    const values = Array.from(unfinished).map((name) => chances.get(name)).sort((a, b) => a - b);
+
+    if (values.length === 0) {
+      return null;
+    }
+
+    const middle = Math.floor(values.length / 2);
+    if (values.length % 2) {
+      return values[middle];
+    }
+
+    return (values[middle - 1] + values[middle]) / 2;
+  }
+
   // One random roll per eligible step without a visible collision.
   // `checkBattle` rolls on arrival and again only while walking. But the bot
   // calls stop after every move (`executeAction`), draining the queue.
@@ -733,7 +779,7 @@ const safari = (() => {
     const pokemonGridSubscription = Safari.pokemonGrid.subscribe(() => wake(session));
     const itemGridSubscription = Safari.itemGrid.subscribe(() => wake(session));
 
-    const optionSubscriptions = ["followVisiblePokemon", "collectVisibleItems"].map((name) => {
+    const optionSubscriptions = OPTION_NAMES.map((name) => {
       const option = AutomationSettings.value(SETTINGS_SECTION, name);
       return option.subscribe(() => wake(session));
     });
@@ -838,9 +884,10 @@ const safari = (() => {
     ballContinuation,
     battleActionCandidates,
     battleWeight,
+    calculateChances,
+    calculateMedianChance,
     chooseAction,
     chooseBattleAction,
-    calculateChances,
     createWeights,
     encounterChances,
     escapeProbability,
