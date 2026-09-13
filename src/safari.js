@@ -28,6 +28,8 @@ const safari = (() => {
   function createState(grid) {
     const height = grid.length;
     const width = grid[0].length;
+    const region = Safari.activeRegion();
+    const weights = createWeights(region);
     return {
       grid,
       width,
@@ -45,7 +47,9 @@ const safari = (() => {
       items: [],
       distances: createGrid(height, width, Infinity),
       predecessors: createGrid(height, width, null),
-      weights: createWeights(),
+      weights,
+      region,
+      chances: calculateChances(grid, weights, region),
     };
   }
 
@@ -108,13 +112,10 @@ const safari = (() => {
     return direction.name;
   }
 
-  function createWeights() {
-    const region = Safari.activeRegion();
+  function createWeights(region) {
     const encounters = SafariPokemonList.list[region]();
-    const weights = {
-      grass: { total: 0, weights: new Map() },
-      water: { total: 0, weights: new Map() },
-    };
+    const weights = { grass: new Map(), water: new Map() };
+    const totals = { grass: 0, water: 0 };
 
     for (const encounter of encounters) {
       if (!encounter.isAvailable()) {
@@ -122,20 +123,26 @@ const safari = (() => {
       }
 
       for (const environment of encounter.environments) {
-        let summary;
+        let key;
         switch (environment) {
           case SafariEnvironments.Grass:
-            summary = weights.grass;
+            key = "grass";
             break;
           case SafariEnvironments.Water:
-            summary = weights.water;
+            key = "water";
             break;
           default:
             console.error("[pokeclicker-automation] safari: unknown encounter environment", environment);
             continue;
         }
-        summary.total += encounter.weight;
-        summary.weights.set(encounter.name, encounter.weight);
+        weights[key].set(encounter.name, encounter.weight);
+        totals[key] += encounter.weight;
+      }
+    }
+
+    for (const [key, values] of Object.entries(weights)) {
+      for (const [name, weight] of values) {
+        values.set(name, weight / totals[key]);
       }
     }
 
@@ -161,16 +168,12 @@ const safari = (() => {
     return state.distances[target.y][target.x];
   }
 
-  function probability(summary, pokemon) {
-    if (summary.total === 0) {
-      return 0;
-    }
-
-    return (summary.weights.get(pokemon.name) ?? 0) / summary.total;
+  function probability(pool, pokemon) {
+    return pool.get(pokemon.name) ?? 0;
   }
 
   function effectiveProbability(state, pokemon) {
-    const speciesProbability = Object.values(state.weights).reduce((maximum, summary) => Math.max(maximum, probability(summary, pokemon)), 0);
+    const speciesProbability = Object.values(state.weights).reduce((maximum, pool) => Math.max(maximum, probability(pool, pokemon)), 0);
     const chanceArgument = GameConstants.SHINY_CHANCE_SAFARI / App.game.multiplier.getBonus("shiny");
     const shinyProbability = chanceArgument >= 1 ? 1 / chanceArgument : chanceArgument;
     return speciesProbability * (pokemon.shiny ? shinyProbability : 1 - shinyProbability);
@@ -452,26 +455,101 @@ const safari = (() => {
     return 1;
   }
 
+  // How many background encounters this fight is worth.
   function battleWeight(state, progress) {
-    const environment = Safari.activeEnvironment();
-    let summary;
-    switch (environment) {
-      case SafariEnvironments.Grass:
-        summary = state.weights.grass;
-        break;
-      case SafariEnvironments.Water:
-        summary = state.weights.water;
+    // Plain encounter chance, fixed for the session.
+    const chance = state.chances.get(state.enemy.name);
+    // Neutral eventual catch over 30 balls, using live enemy base factors.
+    const baseline = ballContinuation(state.enemy, { balls: 30, angry: 0, eating: 0, eatingBait: BaitType.Bait }).value;
+    return progress / (chance * baseline);
+  }
+
+  // Counts visible-spawn pool surfaces. Tile kinds map many-to-one onto
+  // environments (Safari.getEnvironmentTile). Occupancy and accessibility are
+  // ignored on purpose.
+  function tileCounts(grid) {
+    const counts = { water: 0, grass: 0 };
+    for (const row of grid) {
+      for (const tile of row) {
+        if (GameConstants.SAFARI_WATER_BLOCKS.includes(tile)) {
+          counts.water++;
+        } else if (GameConstants.SAFARI_LEGAL_WALK_BLOCKS.includes(tile)) {
+          // every walkable non-water tile counts for the grass pool
+          counts.grass++;
+        }
+      }
+    }
+    return counts;
+  }
+
+  // Potential score per species:
+  // randomRate * max(terrainChance) + visibleRate * sum(placementFraction * terrainChance).
+  //
+  // NormalizeD across listed species. Random availability ignores terrain area.
+  // Visible availability assumes successful placement and harvest.
+  function encounterChances(terrains, randomRate, visibleRate) {
+    const rates = new Map();
+    const bestTerrainChances = new Map();
+    for (const { terrainChances, placementFraction } of terrains) {
+      for (const [name, terrainChance] of terrainChances) {
+        if (terrainChance > (bestTerrainChances.get(name) ?? 0)) {
+          bestTerrainChances.set(name, terrainChance);
+        }
+        const rate = visibleRate * placementFraction * terrainChance;
+        rates.set(name, (rates.get(name) ?? 0) + rate);
+      }
+    }
+
+    for (const [name, rate] of rates) {
+      rates.set(name, rate + randomRate * (bestTerrainChances.get(name) ?? 0));
+    }
+
+    const total = rates.values().reduce((sum, rate) => sum + rate, 0);
+    for (const [name, rate] of rates) {
+      rates.set(name, rate / total);
+    }
+    return rates;
+  }
+
+  // One random roll per eligible step without a visible collision.
+  // `checkBattle` rolls on arrival and again only while walking. But the bot
+  // calls stop after every move (`executeAction`), draining the queue.
+  function randomEncounterRate(region) {
+    // SeededRand.chance(n > 1) is 1-in-n, not percent.
+    let chance;
+    switch (region) {
+      case GameConstants.Region.alola:
+        chance = GameConstants.SAFARI_MJ_BATTLE_CHANCE;
         break;
       default:
-        console.error("[pokeclicker-automation] safari: unknown active environment", environment);
+        chance = GameConstants.SAFARI_BATTLE_CHANCE;
         break;
     }
-    // Static current-environment spawn share: an approximation for pursued encounters.
-    const share = summary.weights.get(state.enemy.name) / summary.total;
-    // FIXED neutral eventual catch over 30 balls, using live enemy base factors
-    // (and the existing level/Oak modifiers), never the per-throw catch probability.
-    const baseline = ballContinuation(state.enemy, { balls: 30, angry: 0, eating: 0, eatingBait: BaitType.Bait }).value;
-    return progress / (share * baseline);
+    return 1 / chance;
+  }
+
+  function calculateTerrains(grid, weights) {
+    const counts = tileCounts(grid);
+    const placeable = counts.grass + counts.water;
+    return [
+      {
+        terrainChances: weights.grass,
+        placementFraction: counts.grass / placeable,
+      },
+      {
+        terrainChances: weights.water,
+        placementFraction: counts.water / placeable,
+      },
+    ];
+  }
+
+  function calculateChances(grid, weights, region) {
+    const terrains = calculateTerrains(grid, weights);
+    const randomRate = randomEncounterRate(region);
+    // spawnPokemonCheck: every 10th step coin flip
+    const visibleRate = 0.5 / 10;
+
+    return encounterChances(terrains, randomRate, visibleRate);
   }
 
   function chooseBattleAction(state) {
@@ -762,10 +840,13 @@ const safari = (() => {
     battleWeight,
     chooseAction,
     chooseBattleAction,
+    calculateChances,
     createWeights,
+    encounterChances,
     escapeProbability,
     executeAction,
     progressValue,
+    randomEncounterRate,
     rockValue,
     updateState,
   };
