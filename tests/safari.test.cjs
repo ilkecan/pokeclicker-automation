@@ -108,6 +108,7 @@ function createGlobals({
   };
   const calls = {
     move: [],
+    sequence: [],
     stop: [],
     throwBall: [],
     throwRock: [],
@@ -156,8 +157,8 @@ function createGlobals({
     isMoving: false,
     moveSpeed: 250,
     getPlayerStartCoords: () => [0, 0],
-    move(direction) { calls.move.push(direction); this.isMoving = true; },
-    stop(direction) { calls.stop.push(direction); this.isMoving = false; },
+    move(direction) { calls.move.push(direction); calls.sequence.push(`move:${direction}`); this.isMoving = true; },
+    stop(direction) { calls.stop.push(direction); calls.sequence.push(`stop:${direction}`); this.isMoving = false; },
     canPay: ko.observable(true),
     openModal() {
       calls.openModal++;
@@ -267,6 +268,8 @@ function createState(automation, globals) {
   const { Safari } = globals;
   const height = Safari.grid.length;
   const width = Safari.grid[0].length;
+  const region = Safari.activeRegion();
+  const weights = automation.createWeights(region);
   const state = {
     grid: Safari.grid,
     width,
@@ -276,7 +279,9 @@ function createState(automation, globals) {
     distances: Array.from({ length: height }, () => Array(width).fill(Infinity)),
     predecessors: Array.from({ length: height }, () => Array(width).fill(null)),
     queue: [],
-    weights: automation.createWeights(),
+    weights,
+    region,
+    chances: automation.calculateChances(Safari.grid, weights, region),
   };
   automation.updateState(state);
   return state;
@@ -387,8 +392,8 @@ test("normalizes environment weights and applies shiny multiplier", (t) => {
   const automation = loadSafari(t, globals);
   const state = createState(automation, globals);
   assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "right" }));
-  assert.equal(state.weights.water.total, 105);
-  assert.equal(state.weights.water.weights.get("WaterRare"), 2);
+  assert.equal(state.weights.water.size, 3);
+  assert.equal(state.weights.water.get("WaterRare"), 2 / 105);
 });
 
 test("moves toward another grass tile without retaining a patrol goal", (t) => {
@@ -913,7 +918,7 @@ test("one-ply rollout gaps are documented as probabilities, not pinned actions",
   assert.ok(nanabThenRockThenBall > ball);
 });
 
-test("K stays fixed across actions, statuses and balls, using only current-environment species share", (t) => {
+test("K stays fixed across actions, statuses and balls, using unified encounter chances", (t) => {
   const globals = createGlobals({
     environment: 1,
     encounters: [encounter("Enemy", 2, 1), encounter("Water", 98, 1), encounter("Enemy", 1, 0)],
@@ -924,8 +929,12 @@ test("K stays fixed across actions, statuses and balls, using only current-envir
   globals.SafariBattle.enemy = pokemon("Enemy", 0, 0, false, { baseCatchFactor: 10 });
   const state = createState(automation, globals);
   const q = 0.1 * (1 - 0.63 ** 30) / (1 - 0.63);
+  // Mirrors calculateChances rates: single-roll random, 0.05 spawn cadence.
+  const randomRate = 1 / GameConstants.SAFARI_BATTLE_CHANCE;
+  const enemyRate = randomRate * 1 + 0.05 * 1;
+  const totalRate = enemyRate + randomRate * 0.98;
   const weight = automation.battleWeight(state, 1);
-  close(weight, 1 / (0.02 * q));
+  close(weight, 1 / ((enemyRate / totalRate) * q));
   assert.ok(Math.abs(weight - 1 / (0.02 * 0.1)) > 100); // Not per throw.
   for (const battle of [
     neutral(1), { ...neutral(12), angry: 5, eatingBait: BaitType.Nanab },
@@ -939,19 +948,37 @@ test("K stays fixed across actions, statuses and balls, using only current-envir
     }
   }
   globals.Safari.activeEnvironment(0);
-  close(automation.battleWeight(state, 1), weight * 0.02);
+  close(automation.battleWeight(state, 1), weight); // Unified price ignores current terrain.
   globals.Safari.activeEnvironment(1);
   state.enemy.levelModifier = 0.5; // Live base/level factors still change the fixed baseline.
   const leveledQ = 0.15 * (1 - 0.595 ** 30) / (1 - 0.595);
-  close(automation.battleWeight(state, 1), 1 / (0.02 * leveledQ));
+  close(automation.battleWeight(state, 1), 1 / ((enemyRate / totalRate) * leveledQ));
+});
+
+test("sand tiles feed the grass spawn channel", (t) => {
+  const sand = GameConstants.SafariTile.sandC;
+  const globals = createGlobals({
+    grid: [[sand, sand]],
+    encounters: [encounter("Enemy", 2, 1), encounter("Water", 98, 1), encounter("Enemy", 1, 0)],
+    ownedPokemons: { Enemy: owned(0) },
+    razz: 1, nanab: 1,
+  });
+  const automation = loadSafari(t, globals);
+  globals.SafariBattle.enemy = pokemon("Enemy", 0, 0, false, { baseCatchFactor: 10 });
+  const state = createState(automation, globals);
+  const q = 0.1 * (1 - 0.63 ** 30) / (1 - 0.63);
+  const randomRate = 1 / GameConstants.SAFARI_BATTLE_CHANCE;
+  const enemyRate = randomRate * 1 + 0.05 * 1;
+  const totalRate = enemyRate + randomRate * 0.98;
+  close(automation.battleWeight(state, 1), 1 / ((enemyRate / totalRate) * q));
 });
 
 test("uncapped endgame progress never rescales the same fight or reads other species", (t) => {
-  for (const share of [0.02, 0.2]) {
+  for (const terrainChance of [0.02, 0.2]) {
     const members = { Enemy: owned(0) };
     const globals = createGlobals({
       ownedPokemons: members, razz: 1, nanab: 1,
-      encounters: [encounter("Enemy", share * 100, 0), encounter("Other", 100 - share * 100, 0)],
+      encounters: [encounter("Enemy", terrainChance * 100, 0), encounter("Other", 100 - terrainChance * 100, 0)],
     });
     const automation = loadSafari(t, globals);
     globals.SafariBattle.enemy = pokemon("Enemy", 0, 0, false, { baseCatchFactor: 10 });
@@ -995,6 +1022,7 @@ test("c=1 skips berries on commons and invests in bottlenecks with separated fli
     ["Chansey", 30, 4, 166, 0, "throwBait", 9.539345162180737, 3.997301044],
   ]) {
     const globals = createGlobals({
+      grid: [[GameConstants.SafariTile.grass, GameConstants.SAFARI_WATER_BLOCKS[0]]],
       environment, razz: 1, nanab: 1, balls: 30,
       ownedPokemons: { [name]: owned(0) },
       encounters: [encounter(name, weight, environment), encounter("Background", total - weight, environment)],
@@ -1019,6 +1047,76 @@ test("c=1 skips berries on commons and invests in bottlenecks with separated fli
       .map(({ value, turns }) => K * value - turns).sort((a, b) => b - a);
     assert.ok(Math.abs(scores[0] - scores[1] - margin) < 1e-9);
   }
+});
+
+test("unified invest/skip decisions hold across visible-rate band", (t) => {
+  // Sensitivity band around the nominal visible 0.05/step: half covers
+  // placement shortfall, double is a stress case above anything placement
+  // can produce. Asymmetric habitats so the band moves chances.
+  const grass = GameConstants.SafariTile.grass;
+  const water = GameConstants.SAFARI_WATER_BLOCKS[0];
+  const grid = Array.from({ length: 10 }, (_, y) =>
+    Array.from({ length: 10 }, () => (y < 2 ? water : grass)));
+  const automation = loadSafari(t, createGlobals({ grid, razz: 1, nanab: 1 }));
+  // Fractions match the 80/20 grid above; tile mapping itself is covered
+  // through calculateChances (sand-channel test).
+  const terrains = [
+    { terrainChances: new Map([["Rare", 1 / 100], ["CommonG", 99 / 100]]), placementFraction: 0.8 },
+    { terrainChances: new Map([["Rare", 1 / 100], ["CommonW", 99 / 100]]), placementFraction: 0.2 },
+  ];
+  const randomRate = automation.randomEncounterRate(GameConstants.Region.kanto);
+  for (const [name, catchFactor, below] of [["Rare", 5, false], ["CommonG", 40, true]]) {
+    const enemy = pokemon(name, 0, 0, false, { baseCatchFactor: catchFactor });
+    const ball = automation.ballContinuation(enemy, neutral());
+    const razz = automation.baitValue(enemy, neutral(), BaitType.Razz);
+    for (const visibleRate of [0.025, 0.05, 0.1]) {
+      const chances = automation.encounterChances(terrains, randomRate, visibleRate);
+      const flip = (razz.value - ball.value) / (chances.get(name) * ball.value * (razz.turns - ball.turns));
+      assert.ok(below ? flip < 1 : flip > 1, `${name} rate=${visibleRate}: ${flip}`);
+    }
+  }
+});
+
+test("pinned invest/skip sides hold across visible-rate band", (t) => {
+  // Pinned rows are single-habitat: rates cancel in normalization, so these
+  // flips are V-invariant. Asserting all three band points locks that
+  // invariance: breaking the cancellation fails loudly instead of drifting.
+  const automation = loadSafari(t, createGlobals({ razz: 1, nanab: 1 }));
+  for (const [name, catchRate, weight, total, below] of [
+    ["Magikarp", 255, 20, 109, true],
+    ["Nidoran(M)", 235, 25, 166, true],
+    ["Chansey", 30, 4, 166, false],
+  ]) {
+    const enemy = pokemon(name, 0, 0, false, { baseCatchFactor: catchRate / 6 });
+    const ball = automation.ballContinuation(enemy, neutral());
+    const razz = automation.baitValue(enemy, neutral(), BaitType.Razz);
+    const terrains = [{
+      terrainChances: new Map([[name, weight / total], ["Background", (total - weight) / total]]),
+      placementFraction: 1,
+    }];
+    for (const visibleRate of [0.025, 0.05, 0.1]) {
+      const chances = automation.encounterChances(terrains, automation.randomEncounterRate(GameConstants.Region.kanto), visibleRate);
+      const flip = (razz.value - ball.value) / (chances.get(name) * ball.value * (razz.turns - ball.turns));
+      assert.ok(below ? flip < 1 : flip > 1, `${name} rate=${visibleRate}: ${flip}`);
+    }
+  }
+});
+
+test("move actions issue one ordered move-then-stop pair", (t) => {
+  // The single-roll random rate rests on this exact sequence: stop drains
+  // the queue before the step animation callback runs. Order and
+  // exactly-once both matter, so one shared log, not two arrays. The roll
+  // count itself is game code, pinned by rate-sensitive K expectations.
+  const globals = createGlobals({});
+  const automation = loadSafari(t, globals);
+  automation.executeAction({ type: "move", direction: "right" });
+  assert.deepEqual(globals.calls.sequence, ["move:right", "stop:right"]);
+});
+
+test("random encounter rate follows region", (t) => {
+  const automation = loadSafari(t, createGlobals({}));
+  assert.equal(automation.randomEncounterRate(GameConstants.Region.kanto), 0.2);
+  assert.equal(automation.randomEncounterRate(GameConstants.Region.alola), 0.1);
 });
 
 test("patrols water encounter tiles when the Safari has no grass", (t) => {
