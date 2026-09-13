@@ -68,6 +68,7 @@ function createGlobals({
   pokemons = [],
   items = [],
   encounters = [encounter("Enemy", 1, 0), encounter("Ignored", 1, 0)],
+  catchRates = {},
   balls = 10,
   inProgress = false,
   inBattle = false,
@@ -158,6 +159,7 @@ function createGlobals({
     itemGrid,
     isMoving: false,
     moveSpeed: 250,
+    safariLevel: () => 1,
     getPlayerStartCoords: () => [0, 0],
     move(direction) { calls.move.push(direction); calls.sequence.push(`move:${direction}`); this.isMoving = true; },
     stop(direction) { calls.stop.push(direction); calls.sequence.push(`stop:${direction}`); this.isMoving = false; },
@@ -207,8 +209,11 @@ function createGlobals({
     }],
   };
   const SafariPokemonList = { list: { [region]: ko.observable(encounters) } };
+  const PokemonHelper = {
+    getPokemonByName: (name) => ({ catchRate: catchRates[name] ?? 300 }),
+  };
   const context = {
-    $, App, AutomationSettings: settings, Safari, SafariBattle, SafariPokemonList, player,
+    $, App, AutomationSettings: settings, Safari, SafariBattle, SafariPokemonList, player, PokemonHelper,
     BaitType, BaitList, BerryType, OakItemType,
     DisplayObservables: {
       modalState: {
@@ -273,6 +278,7 @@ function createState(automation, globals) {
   const region = Safari.activeRegion();
   const weights = automation.createWeights(region);
   const chances = automation.calculateChances(Safari.grid, weights, region);
+  const environments = automation.calculateEnvironments(Safari.grid);
   const state = {
     grid: Safari.grid,
     width,
@@ -285,6 +291,8 @@ function createState(automation, globals) {
     weights,
     region,
     chances,
+    environments,
+    environmentWork: automation.calculateEnvironmentWork(chances, region, environments),
     medianChance: automation.calculateMedianChance(chances, region),
   };
   automation.updateState(state);
@@ -373,8 +381,8 @@ test("keeps the catch-priority filter under the rarity threshold", (t) => {
     ],
     options: { collectVisibleItems: false },
     ownedPokemons: {
-      Resistant: { pokerus: GameConstants.Pokerus.Resistant },
-      Contagious: { pokerus: GameConstants.Pokerus.Contagious },
+      Resistant: owned(0, GameConstants.Pokerus.Resistant),
+      Contagious: owned(0, GameConstants.Pokerus.Contagious),
     },
   });
   const automation = loadSafari(t, globals);
@@ -1234,6 +1242,102 @@ test("random encounter rate follows region", (t) => {
   assert.equal(automation.randomEncounterRate(GameConstants.Region.kanto), 0.2);
   assert.equal(automation.randomEncounterRate(GameConstants.Region.alola), 0.1);
 });
+
+test("patrols the environment with the largest remaining work", (t) => {
+  const grass = GameConstants.SafariTile.grass;
+  const water = GameConstants.SAFARI_WATER_BLOCKS[0];
+  const globals = createGlobals({
+    grid: [[grass, water, water]],
+    position: { x: 1, y: 0 },
+    encounters: [
+      encounter("Grass", 1, 0),
+      encounter("WaterAlmostDone", 1, 1),
+      encounter("WaterBehind", 1, 1),
+      encounter("Unavailable", 100, 0, false),
+    ],
+    catchRates: {
+      Grass: 100,
+      WaterAlmostDone: 100,
+      WaterBehind: 100,
+      Unavailable: 1,
+    },
+    ownedPokemons: {
+      Grass: owned(49),
+      WaterAlmostDone: owned(49),
+      WaterBehind: owned(0),
+    },
+  });
+  const automation = loadSafari(t, globals);
+  const state = createState(automation, globals);
+
+  assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "right" }));
+});
+test("does not patrol toward owned encounters without contagious Pokerus", (t) => {
+  const grass = GameConstants.SafariTile.grass;
+  const water = GameConstants.SAFARI_WATER_BLOCKS[0];
+  const globals = createGlobals({
+    grid: [[grass, water, water]],
+    position: { x: 1, y: 0 },
+    encounters: [
+      encounter("GrassFinished", 1, 0),
+      encounter("Water", 1, 1),
+    ],
+    ownedPokemons: {
+      GrassFinished: owned(0, GameConstants.Pokerus.Uninfected),
+      Water: owned(49),
+    },
+  });
+  const automation = loadSafari(t, globals);
+  const state = createState(automation, globals);
+
+  assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "right" }));
+});
+
+test("uses distance to break equal environment work ties", (t) => {
+  const grass = GameConstants.SafariTile.grass;
+  const ground = GameConstants.SafariTile.ground;
+  const globals = createGlobals({
+    grid: [
+      [grass, ground, 0],
+      [0, grass, grass],
+    ],
+    position: { x: 1, y: 1 },
+    encounters: [encounter("Grass", 1, 0)],
+  });
+  const automation = loadSafari(t, globals);
+  const state = createState(automation, globals);
+
+  assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "right" }));
+});
+
+test("recomputes patrol work after a battle changes Pokerus status", (t) => {
+  const grass = GameConstants.SafariTile.grass;
+  const water = GameConstants.SAFARI_WATER_BLOCKS[0];
+  const members = {
+    Grass: owned(0, GameConstants.Pokerus.Uninfected),
+    Water: owned(49),
+  };
+  const globals = createGlobals({
+    grid: [[grass, water, water]],
+    position: { x: 1, y: 0 },
+    encounters: [
+      encounter("Grass", 1, 0),
+      encounter("Water", 1, 1),
+    ],
+    ownedPokemons: members,
+  });
+  const automation = loadSafari(t, globals);
+  const state = createState(automation, globals);
+  assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "right" }));
+
+  state.inBattle = true;
+  members.Grass = owned(49);
+  globals.battle(false);
+  automation.updateState(state);
+
+  assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "left" }));
+});
+
 
 test("patrols water encounter tiles when the Safari has no grass", (t) => {
   const globals = createGlobals({

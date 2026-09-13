@@ -41,6 +41,7 @@ const safari = (() => {
     const region = Safari.activeRegion();
     const weights = createWeights(region);
     const chances = calculateChances(grid, weights, region);
+    const environments = calculateEnvironments(grid);
     return {
       grid,
       width,
@@ -63,6 +64,8 @@ const safari = (() => {
       weights,
       region,
       chances,
+      environments,
+      environmentWork: calculateEnvironmentWork(chances, region, environments),
       medianChance: calculateMedianChance(chances, region),
     };
   }
@@ -181,6 +184,7 @@ const safari = (() => {
 
     if (previousInBattle && !state.inBattle) {
       state.medianChance = calculateMedianChance(state.chances, state.region);
+      state.environmentWork = calculateEnvironmentWork(state.chances, state.region, state.environments);
     }
 
     buildRoute(state);
@@ -221,6 +225,18 @@ const safari = (() => {
     }
 
     return candidate.distance - best.distance;
+  }
+
+  function compareEncounterTile(candidate, best) {
+    if (best.target === null) {
+      return -1;
+    }
+
+    if (candidate.work !== best.work) {
+      return best.work - candidate.work;
+    }
+
+    return compareDistance(candidate, best);
   }
 
   function* pokemonCandidates(state) {
@@ -271,6 +287,77 @@ const safari = (() => {
     return bestCandidate(itemCandidates(state), compareDistance);
   }
 
+  function encounterEnvironment(tile) {
+    if (tile === GameConstants.SafariTile.grass) {
+      return SafariEnvironments.Grass;
+    }
+
+    if (GameConstants.SAFARI_WATER_BLOCKS.includes(tile)) {
+      return SafariEnvironments.Water;
+    }
+
+    return null;
+  }
+
+  function calculateEnvironments(grid) {
+    const environments = new Set();
+    for (const row of grid) {
+      for (const tile of row) {
+        const environment = encounterEnvironment(tile);
+        if (environment === null) {
+          continue;
+        }
+
+        environments.add(environment);
+      }
+    }
+    return environments;
+  }
+
+  function createEnemy(name) {
+    return {
+      name,
+      baseCatchFactor: PokemonHelper.getPokemonByName(name).catchRate / 6,
+      baseEscapeFactor: 30,
+      levelModifier: (Safari.safariLevel() - 1) / 50,
+    };
+  }
+
+  function calculateEnvironmentWork(chances, region, environments) {
+    const work = new Map();
+    for (const environment of environments) {
+      work.set(environment, 0);
+    }
+
+    const battleState = { chances, enemy: null };
+    for (const encounter of SafariPokemonList.list[region]()) {
+      if (!encounter.isAvailable() || !encounter.environments.some((environment) => work.has(environment))) {
+        continue;
+      }
+
+      let evs;
+      const pokemon = App.game.party.getPokemonByName(encounter.name);
+      if (pokemon) {
+        if (pokemon.pokerus !== GameConstants.Pokerus.Contagious) {
+          continue;
+        }
+
+        evs = pokemon.calculateEVs();
+      } else {
+        const power = App.game.challenges.list.slowEVs.active.peek() ? GameConstants.EP_CHALLENGE_MODIFIER : 1;
+        evs = -1 / power;
+      }
+      battleState.enemy = createEnemy(encounter.name);
+      const remainingWork = battleWeight(battleState, 50 - evs);
+      for (const environment of encounter.environments) {
+        if (work.has(environment)) {
+          work.set(environment, work.get(environment) + remainingWork);
+        }
+      }
+    }
+    return work;
+  }
+
   function* encounterTileCandidates(state) {
     for (let y = 0; y < state.height; y++) {
       for (let x = 0; x < state.grid[y].length; x++) {
@@ -279,8 +366,8 @@ const safari = (() => {
           continue;
         }
 
-        const tile = state.grid[y][x];
-        if (tile !== GameConstants.SafariTile.grass && !GameConstants.SAFARI_WATER_BLOCKS.includes(tile)) {
+        const environment = encounterEnvironment(state.grid[y][x]);
+        if (environment === null) {
           continue;
         }
 
@@ -291,13 +378,13 @@ const safari = (() => {
           continue;
         }
 
-        yield { target, distance };
+        yield { target, distance, work: state.environmentWork.get(environment) };
       }
     }
   }
 
   function bestEncounterTile(state) {
-    return bestCandidate(encounterTileCandidates(state), compareDistance);
+    return bestCandidate(encounterTileCandidates(state), compareEncounterTile);
   }
 
   function chooseTarget(state) {
@@ -890,6 +977,8 @@ const safari = (() => {
     battleActionCandidates,
     battleWeight,
     calculateChances,
+    calculateEnvironmentWork,
+    calculateEnvironments,
     calculateMedianChance,
     chooseAction,
     chooseBattleAction,
