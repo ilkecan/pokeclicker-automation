@@ -1123,6 +1123,7 @@ test("keeps the configured berry reserve for each berry type", (t) => {
     options: { berryReserve: 100 },
   });
   const automation = loadSafari(t, globals);
+  globals.SafariBattle.enemy = pokemon("Enemy", 0, 0, false);
   const state = createState(automation, globals);
   const berryActions = () => automation.battleActionCandidates(state)
     .filter((action) => action.type === "throwBait" && action.bait !== BaitType.Bait)
@@ -1135,6 +1136,18 @@ test("keeps the configured berry reserve for each berry type", (t) => {
   globals.App.game.farming.berryInventory[BerryType.Nanab](101);
   assert.equal(JSON.stringify(berryActions()), JSON.stringify([BaitType.Razz, BaitType.Nanab]));
 });
+test("allows shiny encounters to use reserved berries", (t) => {
+  const globals = createGlobals({ razz: 1, nanab: 1 });
+  const automation = loadSafari(t, globals);
+  const state = {
+    enemy: pokemon("Shiny", 0, 0, true, { baseCatchFactor: 10 }),
+    balls: 4,
+    options: { berryReserve: 1 },
+  };
+
+  assert.equal(automation.chooseBattleAction(state).bait, BaitType.Razz);
+});
+
 
 
 test("c=1 skips berries on commons and invests in bottlenecks with separated flip points", (t) => {
