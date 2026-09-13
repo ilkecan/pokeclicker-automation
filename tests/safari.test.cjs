@@ -91,6 +91,7 @@ function createGlobals({
   const sectionEnabled = ko.observable(enabled);
   const optionValues = {
     followVisiblePokemon: ko.observable(options.followVisiblePokemon ?? true),
+    followRarerVisiblePokemon: ko.observable(options.followRarerVisiblePokemon ?? false),
     collectVisibleItems: ko.observable(options.collectVisibleItems ?? true),
     autoEnter: ko.observable(options.autoEnter ?? true),
   };
@@ -270,6 +271,7 @@ function createState(automation, globals) {
   const width = Safari.grid[0].length;
   const region = Safari.activeRegion();
   const weights = automation.createWeights(region);
+  const chances = automation.calculateChances(Safari.grid, weights, region);
   const state = {
     grid: Safari.grid,
     width,
@@ -281,7 +283,8 @@ function createState(automation, globals) {
     queue: [],
     weights,
     region,
-    chances: automation.calculateChances(Safari.grid, weights, region),
+    chances,
+    medianChance: automation.calculateMedianChance(chances, region),
   };
   automation.updateState(state);
   return state;
@@ -357,11 +360,16 @@ test("prioritizes visible items over Pokémon and rare Pokémon over distance", 
   automation.updateState(state);
   assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "right" }));
 });
-test("filters visible Pokemon by catch priority", (t) => {
+test("keeps the catch-priority filter under the rarity threshold", (t) => {
   const globals = createGlobals({
     grid: [[GameConstants.SafariTile.grass, GameConstants.SafariTile.grass, GameConstants.SafariTile.grass, GameConstants.SafariTile.grass]],
     position: { x: 2, y: 0 },
     pokemons: [pokemon("Resistant", 1, 0), pokemon("Contagious", 3, 0)],
+    encounters: [
+      encounter("Resistant", 9, 0),
+      encounter("Contagious", 1, 0),
+      encounter("Other", 2, 0),
+    ],
     options: { collectVisibleItems: false },
     ownedPokemons: {
       Resistant: { pokerus: GameConstants.Pokerus.Resistant },
@@ -394,6 +402,93 @@ test("normalizes environment weights and applies shiny multiplier", (t) => {
   assert.equal(JSON.stringify(automation.chooseAction(state)), JSON.stringify({ type: "move", direction: "right" }));
   assert.equal(state.weights.water.size, 3);
   assert.equal(state.weights.water.get("WaterRare"), 2 / 105);
+});
+
+test("pursues only visible Pokemon strictly below the unfinished median", (t) => {
+  const globals = createGlobals({
+    grid: [[GameConstants.SafariTile.grass, GameConstants.SafariTile.ground, GameConstants.SafariTile.grass]],
+    position: { x: 1, y: 0 },
+    pokemons: [pokemon("Median", 2, 0)],
+    encounters: [
+      encounter("Low", 1, 0),
+      encounter("Median", 2, 0),
+      encounter("High", 3, 0),
+    ],
+    options: { collectVisibleItems: false, followRarerVisiblePokemon: true },
+  });
+  const automation = loadSafari(t, globals);
+  const state = createState(automation, globals);
+
+  assert.equal(automation.chooseAction(state).direction, "left");
+  globals.pokemonGrid([pokemon("High", 2, 0)]);
+  automation.updateState(state);
+  assert.equal(automation.chooseAction(state).direction, "left");
+  globals.pokemonGrid([pokemon("Low", 2, 0)]);
+  automation.updateState(state);
+  assert.equal(automation.chooseAction(state).direction, "right");
+});
+
+test("lowers the visible pursuit threshold after a species finishes", (t) => {
+  const members = {};
+  const globals = createGlobals({
+    grid: [Array(5).fill(GameConstants.SafariTile.grass)],
+    position: { x: 2, y: 0 },
+    pokemons: [pokemon("Low", 0, 0), pokemon("Middle", 4, 0)],
+    encounters: [
+      encounter("Low", 1, 0),
+      encounter("Middle", 3, 0),
+      encounter("High", 6, 0),
+    ],
+    inProgress: true,
+    options: { collectVisibleItems: false, followRarerVisiblePokemon: true },
+    ownedPokemons: members,
+  });
+  const automation = loadSafari(t, globals);
+  const state = createState(automation, globals);
+  const weights = state.weights;
+  const chances = state.chances;
+  const median = state.medianChance;
+  assert.equal(automation.chooseAction(state).direction, "left");
+
+  globals.battle(true);
+  automation.updateState(state);
+  members.Low = owned(50, GameConstants.Pokerus.Resistant);
+  globals.battle(false);
+  automation.updateState(state);
+  assert.equal(state.weights, weights);
+  assert.equal(state.chances, chances);
+  assert.notEqual(state.medianChance, median);
+  assert.equal(automation.chooseAction(state).direction, "right");
+  globals.sectionEnabled(false);
+});
+
+test("recomputes visible rarity from new map tile fractions", (t) => {
+  const grass = GameConstants.SafariTile.grass;
+  const water = GameConstants.SAFARI_WATER_BLOCKS[0];
+  const globals = createGlobals({
+    grid: [[grass, grass, grass, water]],
+    position: { x: 1, y: 0 },
+    pokemons: [pokemon("Water", 3, 0)],
+    encounters: [
+      encounter("Grass", 1, 0),
+      encounter("Water", 1, 1),
+    ],
+    inProgress: true,
+    options: { collectVisibleItems: false, followRarerVisiblePokemon: true },
+  });
+  const automation = loadSafari(t, globals);
+  automation.automate();
+  globals.runTimer();
+  assert.deepEqual(globals.calls.move, ["right"]);
+
+  globals.progress(false);
+  globals.Safari.grid = [[grass, water, water, water]];
+  globals.Safari.playerXY = { x: 1, y: 0 };
+  globals.pokemonGrid([pokemon("Grass", 3, 0)]);
+  globals.progress(true);
+  globals.runTimer();
+  assert.deepEqual(globals.calls.move, ["right", "right"]);
+  globals.sectionEnabled(false);
 });
 
 test("moves toward another grass tile without retaining a patrol goal", (t) => {
