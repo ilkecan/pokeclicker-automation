@@ -531,13 +531,15 @@ const safari = (() => {
   }
 
   function battleActionCandidates(state) {
+    const { enemy } = state;
     const candidates = [
       { type: ActionType.THROW_BAIT, bait: BaitType.Bait },
       { type: ActionType.THROW_BALL },
       { type: ActionType.THROW_ROCK },
     ];
     for (const { inventoryType, bait } of BERRIES) {
-      if (readBerryAmount(inventoryType) > state.options.berryReserve) {
+      const amount = readBerryAmount(inventoryType);
+      if (amount > state.options.berryReserve || (enemy.shiny && amount > 0)) {
         candidates.push({ type: ActionType.THROW_BAIT, bait });
       }
     }
