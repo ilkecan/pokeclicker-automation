@@ -3,9 +3,10 @@
 const safari = (() => {
   const SETTINGS_SECTION = "safari";
   const OPTION_NAMES = Object.freeze([
-    "followVisiblePokemon",
-    "followRarerVisiblePokemon",
+    "berryReserve",
     "collectVisibleItems",
+    "followRarerVisiblePokemon",
+    "followVisiblePokemon",
   ]);
   const SAFARI_MODAL = $("#safariModal");
   const SAFARI_BATTLE_MODAL = $("#safariBattleModal");
@@ -25,6 +26,10 @@ const safari = (() => {
   const ROCK_DURATIONS = Object.freeze([2, 3, 4, 5, 6]); // SafariBattle.throwRock
   const BAIT_DURATIONS = Object.freeze([2, 3, 4, 5, 6]); // BaitList.Bait
   const BERRY_DURATIONS = Object.freeze([2, 3, 4, 5, 6, 7]); // BaitList.Razz/Nanab
+  const BERRIES = Object.freeze([
+    { inventoryType: BerryType.Razz, bait: BaitType.Razz },
+    { inventoryType: BerryType.Nanab, bait: BaitType.Nanab },
+  ]);
 
   function createGrid(height, width, value) {
     return Array.from({ length: height }, () => Array(width).fill(value));
@@ -46,9 +51,10 @@ const safari = (() => {
       balls: 0,
       enemy: null,
       options: {
-        followVisiblePokemon: false,
+        berryReserve: 0,
         collectVisibleItems: false,
         followRarerVisiblePokemon: false,
+        followVisiblePokemon: false,
       },
       pokemons: [],
       items: [],
@@ -437,17 +443,16 @@ const safari = (() => {
     }));
   }
 
-  function battleActionCandidates() {
+  function battleActionCandidates(state) {
     const candidates = [
       { type: ActionType.THROW_BAIT, bait: BaitType.Bait },
       { type: ActionType.THROW_BALL },
       { type: ActionType.THROW_ROCK },
     ];
-    if (readBerryAmount(BerryType.Razz) > 0) {
-      candidates.push({ type: ActionType.THROW_BAIT, bait: BaitType.Razz });
-    }
-    if (readBerryAmount(BerryType.Nanab) > 0) {
-      candidates.push({ type: ActionType.THROW_BAIT, bait: BaitType.Nanab });
+    for (const { inventoryType, bait } of BERRIES) {
+      if (readBerryAmount(inventoryType) > state.options.berryReserve) {
+        candidates.push({ type: ActionType.THROW_BAIT, bait });
+      }
     }
     return candidates;
   }
@@ -623,7 +628,7 @@ const safari = (() => {
     let bestTurns = Infinity;
 
     // Try each first action once, then balls to the end; re-decide every turn (one-ply).
-    for (const action of battleActionCandidates()) {
+    for (const action of battleActionCandidates(state)) {
       const { value, turns } = actionScore(enemy, battle, action);
       const score = weight * value - turnCost * turns;
       if (score > bestScore || (score === bestScore && turns < bestTurns)) {

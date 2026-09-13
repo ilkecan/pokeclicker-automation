@@ -69,10 +69,11 @@ const settingsDefinitions = (() => {
       label: "Safari",
       defaultValue: true,
       options: [
-        { id: "followVisiblePokemon", label: "Follow visible Pokémon", type: "boolean", defaultValue: true },
-        { id: "followRarerVisiblePokemon", label: "Follow rarer visible Pokémon", type: "boolean", defaultValue: true },
-        { id: "collectVisibleItems", label: "Collect visible items", type: "boolean", defaultValue: true },
         { id: "autoEnter", label: "Automatically enter Safari", type: "boolean", defaultValue: true },
+        { id: "berryReserve", label: "Razz/Nanab berries to keep in reserve", type: "nonNegativeInteger", defaultValue: 0 },
+        { id: "collectVisibleItems", label: "Collect visible items", type: "boolean", defaultValue: true },
+        { id: "followRarerVisiblePokemon", label: "Follow rarer visible Pokémon", type: "boolean", defaultValue: true },
+        { id: "followVisiblePokemon", label: "Follow visible Pokémon", type: "boolean", defaultValue: true },
       ],
     },
     {

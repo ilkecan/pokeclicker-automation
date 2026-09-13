@@ -93,6 +93,7 @@ function createGlobals({
     followVisiblePokemon: ko.observable(options.followVisiblePokemon ?? true),
     followRarerVisiblePokemon: ko.observable(options.followRarerVisiblePokemon ?? false),
     collectVisibleItems: ko.observable(options.collectVisibleItems ?? true),
+    berryReserve: ko.observable(options.berryReserve ?? 0),
     autoEnter: ko.observable(options.autoEnter ?? true),
   };
   const progress = ko.observable(inProgress);
@@ -277,7 +278,7 @@ function createState(automation, globals) {
     width,
     height,
     position: { x: Safari.playerXY.x, y: Safari.playerXY.y },
-    options: { followVisiblePokemon: true, collectVisibleItems: true },
+    options: { followVisiblePokemon: true, collectVisibleItems: true, berryReserve: 0 },
     distances: Array.from({ length: height }, () => Array(width).fill(Infinity)),
     predecessors: Array.from({ length: height }, () => Array(width).fill(null)),
     queue: [],
@@ -964,7 +965,7 @@ test("shiny catch-max precedes EV and ownership reads, including unowned and Res
     const globals = createGlobals({ razz: 1, nanab: 1, ownedPokemons: members });
     const automation = loadSafari(t, globals);
     const enemy = pokemon("Enemy", 0, 0, true, { baseCatchFactor: 10 });
-    const state = { enemy, balls: 4, inBattle: true, busy: false };
+    const state = { enemy, balls: 4, inBattle: true, busy: false, options: { berryReserve: 0 } };
     const unavailable = () => assert.fail("shiny decisions must precede progress/spawn reads");
     globals.App.game.party.getPokemonByName = unavailable;
     globals.App.game.party.alreadyCaughtPokemonByName = unavailable;
@@ -977,7 +978,7 @@ test("shiny catch-max precedes EV and ownership reads, including unowned and Res
   const automation = loadSafari(t, globals);
   // A saturated, already-angry shiny is guaranteed on this ball; setup can lose it.
   const enemy = pokemon("Enemy", 0, 0, true, { baseCatchFactor: 42.5, levelModifier: 0.98, angry: 5 });
-  assert.equal(automation.chooseBattleAction({ enemy, balls: 1 }).type, "throwBall");
+  assert.equal(automation.chooseBattleAction({ enemy, balls: 1, options: { berryReserve: 0 } }).type, "throwBall");
 });
 
 test("zero-deposit owned encounters run but negative scores never summon RUN", (t) => {
@@ -992,7 +993,7 @@ test("zero-deposit owned encounters run but negative scores never summon RUN", (
   members.Enemy = owned(49.999);
   assert.equal(automation.progressValue(state.enemy), 1); // Final sliver banks a full catch.
   const weight = automation.battleWeight(state, 1);
-  for (const action of automation.battleActionCandidates()) {
+  for (const action of automation.battleActionCandidates(state)) {
     const { value, turns } = automation.actionScore(state.enemy, neutral(1), action);
     assert.ok(weight * value - turns < 0);
   }
@@ -1037,7 +1038,7 @@ test("K stays fixed across actions, statuses and balls, using unified encounter 
   ]) {
     Object.assign(state.enemy, battle);
     state.balls = battle.balls;
-    for (const action of automation.battleActionCandidates()) {
+    for (const action of automation.battleActionCandidates(state)) {
       automation.actionScore(state.enemy, battle, action);
       close(automation.battleWeight(state, 1), weight);
     }
@@ -1094,12 +1095,12 @@ test("stock is availability only and is re-read with live statuses", (t) => {
   const globals = createGlobals({ razz: 1, nanab: 1 });
   const automation = loadSafari(t, globals);
   const enemy = pokemon("Enemy", 0, 0, true, { baseCatchFactor: 10 });
-  const state = { enemy, balls: 4 };
+  const state = { enemy, balls: 4, options: { berryReserve: 0 } };
   assert.equal(automation.chooseBattleAction(state).bait, BaitType.Razz);
   globals.App.game.farming.berryInventory[BerryType.Razz](0);
   globals.App.game.farming.berryInventory[BerryType.Nanab](0);
   assert.equal(automation.chooseBattleAction(state).type, "throwBall");
-  assert.ok(automation.battleActionCandidates().every((action) => action.type !== "throwBait" || action.bait === BaitType.Bait));
+  assert.ok(automation.battleActionCandidates(state).every((action) => action.type !== "throwBait" || action.bait === BaitType.Bait));
   globals.App.game.farming.berryInventory[BerryType.Razz](1);
   assert.equal(automation.chooseBattleAction(state).bait, BaitType.Razz);
   globals.App.game.farming.berryInventory[BerryType.Razz](1000);
@@ -1107,6 +1108,26 @@ test("stock is availability only and is re-read with live statuses", (t) => {
   enemy.eatingBait = BaitType.Razz;
   assert.equal(automation.chooseBattleAction(state).type, "throwBall");
 });
+test("keeps the configured berry reserve for each berry type", (t) => {
+  const globals = createGlobals({
+    razz: 100,
+    nanab: 100,
+    options: { berryReserve: 100 },
+  });
+  const automation = loadSafari(t, globals);
+  const state = createState(automation, globals);
+  const berryActions = () => automation.battleActionCandidates(state)
+    .filter((action) => action.type === "throwBait" && action.bait !== BaitType.Bait)
+    .map((action) => action.bait);
+
+  assert.equal(state.options.berryReserve, 100);
+  assert.equal(JSON.stringify(berryActions()), JSON.stringify([]));
+  globals.App.game.farming.berryInventory[BerryType.Razz](101);
+  assert.equal(JSON.stringify(berryActions()), JSON.stringify([BaitType.Razz]));
+  globals.App.game.farming.berryInventory[BerryType.Nanab](101);
+  assert.equal(JSON.stringify(berryActions()), JSON.stringify([BaitType.Razz, BaitType.Nanab]));
+});
+
 
 test("c=1 skips berries on commons and invests in bottlenecks with separated flip points", (t) => {
   // Kanto SafariPokemonList.ts:44–68, all unlocks available (grass total 166, water 109).
@@ -1137,7 +1158,7 @@ test("c=1 skips berries on commons and invests in bottlenecks with separated fli
     } else {
       assert.ok(flip < 0.7);
     }
-    const scores = automation.battleActionCandidates()
+    const scores = automation.battleActionCandidates(state)
       .map((action) => automation.actionScore(state.enemy, neutral(), action))
       .map(({ value, turns }) => K * value - turns).sort((a, b) => b - a);
     assert.ok(Math.abs(scores[0] - scores[1] - margin) < 1e-9);
