@@ -306,7 +306,7 @@ function createRuntime(options = {}) {
       EffectEngineRunner: effectEngine,
       NotificationConstants: notificationConstants,
     });
-    const common = evaluateScope(path.resolve(__dirname, '..', '..', 'src', 'common.js'), [
+    const common = evaluateScope(path.resolve(__dirname, '..', '..', 'src', 'lib.js'), [
       '_and', '_disposeAll', '_runAndSubscribe', '_whenReady',
     ]);
     Object.assign(globalThis, common);

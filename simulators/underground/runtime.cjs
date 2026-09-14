@@ -298,7 +298,7 @@ function createRuntime(options = {}) {
     });
 
     Object.assign(globalThis, evaluateScope(
-      path.resolve(__dirname, '..', '..', 'src', 'common.js'),
+      path.resolve(__dirname, '..', '..', 'src', 'lib.js'),
       ['_disposeAll', '_runAndSubscribe', '_whenReady'],
     ));
     globalThis.AutomationSettings = {
