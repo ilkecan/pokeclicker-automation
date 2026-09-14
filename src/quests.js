@@ -36,17 +36,18 @@ const quests = (() => {
 
     "GainTokensQuest",
     "CapturePokemonsQuest",
-    "CapturePokemonTypesQuest",
     "UsePokeballQuest",
 
     "DefeatGymQuest",
     "DefeatDungeonQuest",
 
+    "ClearBattleFrontierQuest",
+    "CatchShadowsQuest",
+
     "HarvestBerriesQuest",
     "GainFarmPointsQuest",
 
-    "ClearBattleFrontierQuest",
-    "CatchShadowsQuest",
+    "CapturePokemonTypesQuest",
     "UseOakItemQuest",
   ];
 
