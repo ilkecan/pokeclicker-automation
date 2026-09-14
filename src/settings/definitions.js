@@ -65,6 +65,14 @@ const settingsDefinitions = (() => {
       ],
     },
     {
+      id: "purifyChamber",
+      label: "Purify Chamber",
+      defaultValue: true,
+      options: [
+        { id: "purifyPokemon", label: "Purify Pokemon", type: "boolean", defaultValue: true },
+      ],
+    },
+    {
       id: "safari",
       label: "Safari",
       defaultValue: true,

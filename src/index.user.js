@@ -10,6 +10,7 @@
 // @require     gym.js
 // @require     hatchery.js
 // @require     items.js
+// @require     purify-chamber.js
 // @require     quests.js
 // @require     safari.js
 // @require     shop.js
@@ -36,6 +37,7 @@ GameLoadState.onLoadState(GameLoadState.states.running, () => {
     gym,
     hatchery,
     items,
+    purifyChamber,
     quests,
     safari,
     shop,
