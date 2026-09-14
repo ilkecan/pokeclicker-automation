@@ -14,8 +14,8 @@ test('loads official game dependencies', (t) => {
 
 test('creates isolated script contexts', (t) => {
   const harness = createHarness(t);
-  const first = harness.loadScripts(['src/common.js'], {}, '_and');
-  const second = harness.loadScripts(['src/common.js'], {}, '_and');
+  const first = harness.loadScripts(['src/lib.js'], {}, '_and');
+  const second = harness.loadScripts(['src/lib.js'], {}, '_and');
   first.context.marker = true;
   assert.equal(second.context.marker, undefined);
   assert.equal(typeof first.value, 'function');

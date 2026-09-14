@@ -55,7 +55,7 @@ function createHarness(t) {
     },
     loadAutomation(name, globals = {}, exportName = name) {
       const result = harness.loadScripts(
-        ['src/common.js', `src/automation/${name}.js`],
+        ['src/lib.js', `src/automation/${name}.js`],
         globals,
         exportName,
       );

@@ -4,7 +4,7 @@
 // @match       https://www.pokeclicker.com/
 // @match       pokeclicker://game/index.html
 // @match       file:///home/*/.config/pokeclicker-desktop/pokeclicker-master/docs/index.html
-// @require     common.js
+// @require     lib.js
 // @require     automation/dungeon.js
 // @require     automation/farm.js
 // @require     automation/gym.js
