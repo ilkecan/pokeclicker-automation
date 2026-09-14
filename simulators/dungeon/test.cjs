@@ -10,7 +10,7 @@ const { createRuntime, defaultGameDir } = require('./runtime.cjs');
 
 const cli = path.join(__dirname, 'cli.cjs');
 const compare = path.join(__dirname, 'compare.cjs');
-const automation = path.resolve(__dirname, '..', '..', 'src', 'dungeon.js');
+const automation = path.resolve(__dirname, '..', '..', 'src', 'automation', 'dungeon.js');
 
 function run(extra = []) {
   const result = spawnSync(process.execPath, [cli, '--per-map', ...extra], { encoding: 'utf8' });

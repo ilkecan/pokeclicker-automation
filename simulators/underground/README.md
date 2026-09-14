@@ -1,6 +1,6 @@
 # Underground simulator
 
-This simulator runs `src/underground.js` against the official PokéClicker mining implementation. Mine generation, items, tools, surveys, rewards and battery patterns therefore stay aligned with the game.
+This simulator runs `src/automation/underground.js` against the official PokéClicker mining implementation. Mine generation, items, tools, surveys, rewards and battery patterns therefore stay aligned with the game.
 
 ## Run
 

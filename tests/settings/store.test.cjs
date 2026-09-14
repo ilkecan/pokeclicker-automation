@@ -34,7 +34,7 @@ function loadSettings(t, stored = null) {
     console: { warn() {}, error() {} },
   };
   const loaded = createHarness(t).loadScripts(
-    ["src/common.js", "src/dungeon.js", "src/shop.js", "src/settings/definitions.js", "src/settings/store.js"],
+    ["src/common.js", "src/automation/dungeon.js", "src/automation/shop.js", "src/settings/definitions.js", "src/settings/store.js"],
     context,
     "({ settings: AutomationSettings, shop })",
   );
