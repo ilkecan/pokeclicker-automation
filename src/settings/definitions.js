@@ -49,7 +49,7 @@ const settingsDefinitions = (() => {
     },
     {
       id: "items",
-      label: "Held Items",
+      label: "Items",
       defaultValue: true,
       options: [
         { id: "giveHeldItems", label: "Give held items", type: "boolean", defaultValue: true },
