@@ -36,16 +36,7 @@ function loadFarm(t, {
     },
     canCatchWanderer: () => Boolean(plotWanderer()) && !catching && !fleeing,
   };
-  const values = {
-    catchWanderers: true,
-    useGooeyMulch: useGooey,
-    harvestWitheringBerries: false,
-  };
   const context = {
-    AutomationSettings: {
-      getValue: (_section, id) => values[id],
-      isEnabled: () => true,
-    },
     App: {
       game: {
         farming: {
@@ -70,6 +61,9 @@ function loadFarm(t, {
     console: { error: (...args) => events.push(["error", ...args]) },
   };
   const loaded = createHarness(t).loadAutomation("farm", context);
+  loaded.settings.value("farm", "catchWanderers")(true);
+  loaded.settings.value("farm", "useGooeyMulch")(useGooey);
+  loaded.settings.value("farm", "harvestWitheringBerries")(false);
   return { ...context, farm: loaded.automation, events, plot };
 }
 

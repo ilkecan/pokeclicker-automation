@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const path = require('node:path');
 const test = require('node:test');
 const { createHarness } = require('./harness.cjs');
 const { installTypeScriptLoader } = require('../../lib/runtime.cjs');
@@ -39,4 +40,22 @@ test('restores the TypeScript loader', (t) => {
   const loader = installTypeScriptLoader(harness.gameDir, new Map());
   loader.restore();
   assert.equal(require('node:module')._extensions['.ts'], originalLoader);
+});
+
+test('loadAutomation provides the real settings store with no mock', (t) => {
+  const harness = createHarness(t);
+  const loaded = harness.loadAutomation('gym', {});
+  assert.equal(loaded.sourcePath, path.join(harness.projectDir, 'src', 'automation', 'gym.js'));
+  const settings = loaded.settings;
+  assert.deepEqual(
+    [...settings.sections.map((section) => section.id)],
+    ['dungeon', 'farm', 'gym', 'hatchery', 'items', 'quests', 'purifyChamber', 'safari', 'shop', 'underground'],
+  );
+  assert.equal(settings.getValue('gym', 'autoRestart'), true);
+  settings.value('gym', 'autoRestart')(false);
+  assert.equal(settings.getValue('gym', 'autoRestart'), false);
+  assert.equal(settings.isEnabled('gym'), true);
+  settings.enabled('gym')(false);
+  assert.equal(settings.isEnabled('gym'), false);
+  assert.throws(() => settings.getValue('gym', 'noSuchOption'), /unknown gym automation option/);
 });

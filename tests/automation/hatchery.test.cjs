@@ -47,7 +47,6 @@ function loadHatchery(t, {
 }) {
   const harness = createHarness(t);
   const pokemonsById = new Map(caughtPokemon.map((pokemon) => [pokemon.id, pokemon]));
-  const enabled = ko.observable(automationEnabled);
   const addedPokemon = [];
   const context = {
     App: {
@@ -72,18 +71,17 @@ function loadHatchery(t, {
         keyItems: { hasKeyItem: () => pokerusUnlocked },
       },
     },
-    AutomationSettings: {
-      getValue: (_section, option) => option === "spreadPokerus" ? spreadPokerus : option === "manageHelpers" ? manageHelpers : option === "fillEggSlots" ? fillEggSlots : true,
-      value: (_section, option) => createObservable(option === "manageHelpers" ? manageHelpers : true),
-      isEnabled: () => enabled(),
-    },
     BreedingController: { hatcherySortedFilteredList: () => filteredCandidates },
     KeyItemType: { Pokerus_virus: "Pokerus_virus" },
     PokemonHelper: { getPokemonById: (id) => pokemonsById.get(id) },
   };
   const loaded = harness.loadAutomation("hatchery", context);
-  loaded.context.disableAutomation = (t) => {
-    enabled(false);
+  loaded.settings.value("hatchery", "spreadPokerus")(spreadPokerus);
+  loaded.settings.value("hatchery", "manageHelpers")(manageHelpers);
+  loaded.settings.value("hatchery", "fillEggSlots")(fillEggSlots);
+  loaded.settings.enabled("hatchery")(automationEnabled);
+  loaded.context.disableAutomation = () => {
+    loaded.settings.enabled("hatchery")(false);
     ko.tasks.runEarly();
   };
   return returnContext ? {

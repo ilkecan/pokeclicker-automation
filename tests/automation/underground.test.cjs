@@ -33,8 +33,8 @@ function loadOfficialMetadata() {
     globalThis.player = { highestRegion: () => 9 };
     const { ItemList } = require(path.join(modulesDir, "items/ItemList.ts"));
     const { HeldItem } = require(path.join(modulesDir, "items/HeldItem.ts"));
-    const UndergroundItems = require(path.join(modulesDir, "underground/UndergroundItems.ts")).default;
-    const UndergroundItemValueType = require(path.join(modulesDir, "enums/UndergroundItemValueType.ts")).default;
+    const UndergroundItems = require(path.join(modulesDir, "underground", "UndergroundItems.ts")).default;
+    const UndergroundItemValueType = require(path.join(modulesDir, "enums", "UndergroundItemValueType.ts")).default;
     const dealItemList = new Proxy(ItemList, {
       get(target, name) {
         return target[name] || { basePrice: 1, name: String(name), isSoldOut: () => false };
@@ -44,7 +44,7 @@ function loadOfficialMetadata() {
       canonicalModulePath(path.join(modulesDir, "items/ItemList")),
       { ItemList: dealItemList },
     );
-    const { ShardDeal } = require(path.join(modulesDir, "underground/ShardDeal.ts"));
+    const { ShardDeal } = require(path.join(modulesDir, "underground", "ShardDeal.ts"));
     ShardDeal.generateDeals();
     return { ItemList, HeldItem, UndergroundItems, UndergroundItemValueType, ShardDeal };
   } finally {
@@ -91,10 +91,12 @@ function loadUnderground(t, {
     ItemList: official.ItemList,
     HeldItem: official.HeldItem,
     ShardDeal: { list: shardDealList },
-    AutomationSettings: { getValue: () => sell },
     UndergroundTrading: { quickSell: (treasure) => quickSold.push(treasure.itemName) },
     player: { itemList: inventoryList },
   });
+  for (const option of ["dig", "sellGemPlates", "sellTreasures"]) {
+    loaded.settings.value("underground", option)(sell);
+  }
   return { ...loaded, quickSold, shardDealList };
 }
 
