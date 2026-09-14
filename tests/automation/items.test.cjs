@@ -36,10 +36,6 @@ function loadItems(t, { stock = 1, canUse = () => true } = {}) {
     return pokemon;
   });
   const context = {
-    AutomationSettings: {
-      getValue: () => true,
-      enabled: () => ko.observable(true),
-    },
     Settings: { getSetting: () => ({ observableValue: () => 0 }) },
     PartyController: { compareBy: () => () => 0 },
     App: { game: { party: { caughtPokemon: pokemons } } },

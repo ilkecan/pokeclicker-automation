@@ -198,22 +198,12 @@ function createGlobals({
     },
   };
   const player = { region, get town() { return townValue(); } };
-  const settings = {
-    enabled: () => sectionEnabled,
-    isEnabled: () => sectionEnabled(),
-    getValue: (_section, option) => optionValues[option](),
-    value: (_section, option) => optionValues[option],
-    sections: [{
-      id: "safari",
-      options: Object.entries(optionValues).map(([id, value]) => ({ id, value })),
-    }],
-  };
   const SafariPokemonList = { list: { [region]: ko.observable(encounters) } };
   const PokemonHelper = {
     getPokemonByName: (name) => ({ catchRate: catchRates[name] ?? 300 }),
   };
   const context = {
-    $, App, AutomationSettings: settings, Safari, SafariBattle, SafariPokemonList, player, PokemonHelper,
+    $, App, Safari, SafariBattle, SafariPokemonList, player, PokemonHelper,
     BaitType, BaitList, BerryType, OakItemType,
     DisplayObservables: {
       modalState: {
@@ -256,7 +246,16 @@ function createGlobals({
 }
 
 function loadSafari(t, globals) {
-  return createHarness(t).loadAutomation("safari", globals.context).automation;
+  const loaded = createHarness(t).loadAutomation("safari", globals.context);
+  for (const [id, value] of Object.entries(globals.optionValues)) {
+    loaded.settings.value("safari", id)(value());
+  }
+  loaded.settings.enabled("safari")(globals.sectionEnabled());
+  globals.optionValues = Object.fromEntries(
+    Object.keys(globals.optionValues).map((id) => [id, loaded.settings.value("safari", id)]),
+  );
+  globals.sectionEnabled = loaded.settings.enabled("safari");
+  return loaded.automation;
 }
 
 function close(actual, expected) {

@@ -27,16 +27,6 @@ function loadShop(t, {
     targetBerry_Shovel: ko.observable(targets.Berry_Shovel ?? 0),
     targetMulch_Shovel: ko.observable(targets.Mulch_Shovel ?? 0),
   };
-  const sectionEnabled = ko.observable(enabled);
-  const settings = {
-    sections: [{
-      id: "shop",
-      options: Object.keys(values).map((id) => ({ id, type: "nonNegativeInteger", value: values[id] })),
-    }],
-    value: (_section, id) => values[id],
-    getValue: (_section, id) => values[id](),
-    isEnabled: () => sectionEnabled(),
-  };
   const money = ko.observable(currency);
   const itemsByName = new Map();
 
@@ -75,19 +65,21 @@ function loadShop(t, {
   };
 
   const context = {
-    AutomationSettings: settings,
     pokeMartShop: { items: balls.map(makeBall) },
     player: { itemMultipliers },
     App: { game: { wallet: { currencies: { money } } } },
     ShopHandler: { shortcutVisible: () => true },
   };
   const loaded = createHarness(t).loadAutomation("shop", context);
+  const settings = loaded.settings;
+  for (const [id, value] of Object.entries(values)) settings.value("shop", id)(value());
+  settings.enabled("shop")(enabled);
   return {
     shop: loaded.automation,
-    values,
+    values: Object.fromEntries(Object.keys(values).map((id) => [id, settings.value("shop", id)])),
     balls: itemsByName,
     money,
-    sectionEnabled,
+    sectionEnabled: settings.enabled("shop"),
   };
 }
 

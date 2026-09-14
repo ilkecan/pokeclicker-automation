@@ -684,15 +684,9 @@ function loadRestartDungeon(t, {
 } = {}) {
   const harness = createHarness(t);
   const { ko } = harness.game;
-  const sectionEnabled = ko.observable(true);
   const currentQuests = ko.observable([]);
   const initialized = [];
   const includeShinyValues = [];
-  const settings = {
-    smartAutoRestart,
-    restartUponLoss,
-    restartUponWin,
-  };
   const target = {
     name: "Test Dungeon",
     allAvailablePokemon: () => possiblePokemon,
@@ -720,10 +714,6 @@ function loadRestartDungeon(t, {
         quests: { currentQuests },
       },
     },
-    AutomationSettings: {
-      enabled: () => sectionEnabled,
-      getValue: (_section, id) => settings[id],
-    },
     DefeatDungeonQuest: class DefeatDungeonQuest {},
     DungeonGuides: { hired: () => guidesHired },
     DungeonRunner,
@@ -748,12 +738,16 @@ function loadRestartDungeon(t, {
     currentQuests([dungeonQuest]);
   }
 
-  const dungeon = harness.loadAutomation("dungeon", {
+  const loaded = harness.loadAutomation("dungeon", {
     ...context,
     dungeonList: {},
-  }).automation;
+  });
+  const dungeon = loaded.automation;
+  loaded.settings.value("dungeon", "smartAutoRestart")(smartAutoRestart);
+  loaded.settings.value("dungeon", "restartUponLoss")(restartUponLoss);
+  loaded.settings.value("dungeon", "restartUponWin")(restartUponWin);
   dungeon.automate();
-  harness.addCleanup(() => sectionEnabled(false));
+  harness.addCleanup(() => loaded.settings.enabled("dungeon")(false));
 
   return { dungeon, includeShinyValues, initialized, target };
 }

@@ -12,22 +12,8 @@ function loadGym(t, {
 } = {}) {
   const harness = createHarness(t);
   const { ko } = harness.game;
-  const sectionEnabled = ko.observable(true);
-  const parent = ko.observable(autoRestart);
-  const smart = ko.observable(smartAutoRestart);
   const currentQuests = ko.observable(quests);
   const defeatedStats = stats.map((value) => typeof value === "function" ? value : ko.observable(value));
-  const settingCalls = [];
-  const settings = {
-    enabled: () => sectionEnabled,
-    value(section, id) {
-      settingCalls.push({ section, id });
-      return id === "autoRestart" ? parent : smart;
-    },
-    getValue(section, id) {
-      return this.value(section, id)();
-    },
-  };
   const target = {
     town: "Pewter City",
     clears: () => 1,
@@ -75,24 +61,27 @@ function loadGym(t, {
   const DefeatGymQuest = class DefeatGymQuest {};
   const context = {
     App,
-    AutomationSettings: settings,
     DefeatGymQuest,
     GymRunner,
     GameConstants,
     areaStatus: { missingAchievement: "missingAchievement" },
   };
-  const gym = harness.loadAutomation("gym", context).automation;
+  const loaded = harness.loadAutomation("gym", context);
+  const settings = loaded.settings;
+  settings.value("gym", "autoRestart")(autoRestart);
+  settings.value("gym", "smartAutoRestart")(smartAutoRestart);
+  const gym = loaded.automation;
   gym.automate();
-  harness.addCleanup(() => sectionEnabled(false));
+  harness.addCleanup(() => settings.enabled("gym")(false));
 
   return {
     ko,
     ...context,
+    settings,
+    parent: settings.value("gym", "autoRestart"),
+    sectionEnabled: settings.enabled("gym"),
     originalStartGym,
     originalGymWon,
-    parent,
-    sectionEnabled,
-    settingCalls,
     currentQuests,
     target,
   };
@@ -149,7 +138,6 @@ test("startGym omitted argument keeps clears default and smart disabled preserve
   const state = loadGym(t, { smartAutoRestart: false });
   assert.equal(state.target.clears(), 1);
   state.GymRunner.startGym(state.target);
-  assert.equal(state.settingCalls.some(({ id }) => id === "autoRestart"), true);
   settle(state);
   assert.equal(state.GymRunner.started.restart, true, JSON.stringify(state.GymRunner.started));
   assert.equal(state.GymRunner.autoRestart(), true);

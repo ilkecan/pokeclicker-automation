@@ -15,8 +15,6 @@ function loadPurifyChamber(t, {
   pokemons = [],
   shortcutVisible = true,
 } = {}) {
-  const sectionEnabled = ko.observable(enabled);
-  const optionEnabled = ko.observable(purifyPokemon);
   const visible = ko.observable(shortcutVisible);
   const currentFlow = ko.observable(flow);
   const requiredFlow = ko.observable(flowNeeded);
@@ -38,25 +36,30 @@ function loadPurifyChamber(t, {
   };
   const loaded = createHarness(t).loadAutomation("purify-chamber", {
     App: { game: { party: { caughtPokemon: pokemons }, purifyChamber: chamber } },
-    AutomationSettings: {
-      getValue: () => optionEnabled(),
-      isEnabled: () => sectionEnabled(),
-      value: () => optionEnabled,
-    },
     PurifyChamber: { shortcutVisible: () => visible() },
   }, "purifyChamber");
+  const settings = loaded.settings;
+  settings.value("purifyChamber", "purifyPokemon")(purifyPokemon);
+  settings.enabled("purifyChamber")(enabled);
   return {
     automation: loaded.automation,
+    settings,
     currentFlow,
     purified,
-    optionEnabled,
-    sectionEnabled,
     visible,
   };
 }
 
 function shadowPokemon(id, attack) {
   return { id, attack, shadow: GameConstants.ShadowStatus.Shadow };
+}
+
+function setPurifyPokemon(state, value) {
+  state.settings.value("purifyChamber", "purifyPokemon")(value);
+}
+
+function setSectionEnabled(state, value) {
+  state.settings.enabled("purifyChamber")(value);
 }
 
 test("purifies the highest-attack Shadow Pokemon when enough flow accumulates", (t) => {
@@ -86,13 +89,13 @@ test("purifyPokemon option disposes and restores purification readiness", (t) =>
   });
 
   state.automation.automate();
-  state.optionEnabled(false);
+  setPurifyPokemon(state, false);
   ko.tasks.runEarly();
   state.currentFlow(100);
   ko.tasks.runEarly();
   assert.deepEqual(state.purified, []);
 
-  state.optionEnabled(true);
+  setPurifyPokemon(state, true);
   ko.tasks.runEarly();
   assert.deepEqual(state.purified, [pokemon.id]);
 });
@@ -111,7 +114,7 @@ test("requires both the shortcut and Purify Chamber setting", (t) => {
   ko.tasks.runEarly();
   assert.deepEqual(state.purified, []);
 
-  state.sectionEnabled(true);
+  setSectionEnabled(state, true);
   ko.tasks.runEarly();
   assert.deepEqual(state.purified, [pokemon.id]);
 });
@@ -124,13 +127,13 @@ test("disabling the section disposes purification readiness", (t) => {
   });
 
   state.automation.automate();
-  state.sectionEnabled(false);
+  setSectionEnabled(state, false);
   ko.tasks.runEarly();
   state.currentFlow(100);
   ko.tasks.runEarly();
   assert.deepEqual(state.purified, []);
 
-  state.sectionEnabled(true);
+  setSectionEnabled(state, true);
   ko.tasks.runEarly();
   assert.deepEqual(state.purified, [pokemon.id]);
 });
