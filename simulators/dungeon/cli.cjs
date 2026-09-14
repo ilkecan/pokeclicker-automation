@@ -9,7 +9,7 @@ const REPORT_FILE_ENV = 'POKECLICKER_DUNGEON_REPORT_FILE';
 function usage() {
   return `Usage: ./simulators/dungeon/cli.cjs [options]
 
-Runs src/dungeon.js against official PokéClicker dungeon map and runner code.
+Runs src/automation/dungeon.js against official PokéClicker dungeon map and runner code.
 Successful output is minified JSON; use --pretty for indented JSON.
 
 Options:

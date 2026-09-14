@@ -42,7 +42,7 @@ function defaultGameDir() {
 }
 
 function defaultAutomationPath() {
-  return path.resolve(__dirname, '..', '..', 'src', 'dungeon.js');
+  return path.resolve(__dirname, '..', '..', 'src', 'automation', 'dungeon.js');
 }
 
 function mapHash(map) {

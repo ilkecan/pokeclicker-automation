@@ -1,6 +1,6 @@
 # Dungeon simulator
 
-This simulator runs `src/dungeon.js` against the official PokeClicker dungeon map and runner sources. Official map generation, movement, visibility, chest reveals, timers, ladder bonuses, and win/loss transitions stay in the game source. Unrelated rewards, UI, and combat are mocked; simulated regular and boss battle durations are configurable.
+This simulator runs `src/automation/dungeon.js` against the official PokeClicker dungeon map and runner sources. Official map generation, movement, visibility, chest reveals, timers, ladder bonuses, and win/loss transitions stay in the game source. Unrelated rewards, UI, and combat are mocked; simulated regular and boss battle durations are configurable.
 
 ## Run
 

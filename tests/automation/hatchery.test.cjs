@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { createHarness } = require("./lib/harness.cjs");
+const { createHarness } = require("../lib/harness.cjs");
 
 const constantsHarness = createHarness();
 const { GameConstants, PokemonType, ko } = constantsHarness.game;

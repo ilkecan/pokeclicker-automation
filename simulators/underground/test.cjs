@@ -10,7 +10,7 @@ const { createRuntime, defaultGameDir } = require('./runtime.cjs');
 
 const cli = path.join(__dirname, 'cli.cjs');
 const compare = path.join(__dirname, 'compare.cjs');
-const automation = path.resolve(__dirname, '..', '..', 'src', 'underground.js');
+const automation = path.resolve(__dirname, '..', '..', 'src', 'automation', 'underground.js');
 
 function run(seed, extra = []) {
   const result = spawnSync(process.execPath, [cli, '--single', '--per-mine', '--mines', '4', '--seed', String(seed), ...extra], {

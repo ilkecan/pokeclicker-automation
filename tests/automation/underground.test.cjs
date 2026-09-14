@@ -7,8 +7,8 @@ const {
   canonicalModulePath,
   defaultImport,
   installTypeScriptLoader,
-} = require("../lib/runtime.cjs");
-const { createHarness } = require("./lib/harness.cjs");
+} = require("../../lib/runtime.cjs");
+const { createHarness } = require("../lib/harness.cjs");
 
 const constantsHarness = createHarness();
 const { ko } = constantsHarness.game;

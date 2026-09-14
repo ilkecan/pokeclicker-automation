@@ -43,7 +43,7 @@ function defaultGameDir() {
 }
 
 function defaultAutomationPath() {
-  return path.resolve(__dirname, '..', '..', 'src', 'underground.js');
+  return path.resolve(__dirname, '..', '..', 'src', 'automation', 'underground.js');
 }
 
 function createCounterMap(ko) {
